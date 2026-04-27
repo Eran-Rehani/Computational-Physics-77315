@@ -1,0 +1,12 @@
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.pdf
+__pycache__/
+*.pyc
+.DS_Store
+test_venv/
