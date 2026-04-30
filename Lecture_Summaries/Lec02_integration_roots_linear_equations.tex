@@ -1,0 +1,70 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 02 — Numerical Integration, Root Finding, and Linear Equations
+%% 77315 — Computational Physics
+%% Date: 12/04/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 02 — Numerical Integration, Root Finding, and Linear
+  Equations}\label{sec:lec02}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 12/04/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Numerical Integration (Quadrature)}
+Numerical integration calculates the area under a curve $\int_a^b f(x)\,dx$
+by evaluating the function at specific discrete points.
+
+\begin{itemize}
+    \item \textbf{Simpson's Rule}: Groups points in sets of three and fits a
+    parabola through them. The area under this parabola gives:
+    \begin{equation}
+    \int_{-h}^{h} f(x)\,dx = \frac{h}{3}\bigl[f(-h) + 4f(0) + f(h)\bigr]
+    \end{equation}
+    It is remarkably accurate, possessing a global error of $\bigO{h^4}$.
+
+    \item \textbf{Gauss-Legendre Integration}: Optimises both the weights
+    $w_i$ and sampling locations $x_i$ simultaneously, doubling the degrees
+    of freedom. The optimal $x_i$ match the roots of the Legendre polynomials.
+    Using $n$ optimally placed points, Gauss-Legendre quadrature perfectly
+    integrates any polynomial up to degree $2n-1$.
+
+    \item \textbf{Recursive (Adaptive) Integration}: Evaluates the integral on
+    a coarse interval, splits it in half, and re-evaluates. If the two answers
+    agree within tolerance $\varepsilon$, it stops; otherwise it recursively
+    dives deeper only in highly-varying sub-regions.
+\end{itemize}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Linear Equations (Gaussian Elimination)}
+Solving a system of $n$ linear equations $Ax = b$ is the backbone of almost
+all computational physics. \textbf{Gaussian Elimination} systematically
+subtracts rows to transform $A$ into an upper-triangular matrix in
+$\bigO{n^3}$ operations, then solves by \textbf{Back Substitution} in
+$\bigO{n^2}$.
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!50!black,
+  title=The Critical Necessity of Partial Pivoting]
+During Gaussian elimination, we divide the entire row by the pivot element
+$A_{ii}$. If the pivot is very small, say $10^{-10}$, dividing amplifies
+roundoff errors by a factor of $10^{10}$, destroying the rest of the matrix.
+
+\textbf{Partial Pivoting}: Before processing each column, scan down the rows
+to find the element with the largest absolute magnitude and swap it to the
+top. By always dividing by the largest possible number, we suppress error
+amplification and guarantee numerical stability.
+\end{tcolorbox}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+    \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 4
+    (Integration of Functions), Ch.\ 2.2 (Gaussian Elimination with
+    Backsubstitution).
+    \item \textit{Computational Physics}, Mark Newman --- Ch.\ 5 (Integrals
+    and Derivatives), Ch.\ 6 (Solution of Linear and Nonlinear Equations).
+\end{itemize}

@@ -1,0 +1,121 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 03 — Band Matrices, Least Squares, Gram-Schmidt, and Eigenvalues
+%% 77315 — Computational Physics
+%% Date: 23/04/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 03 — Band Matrices, Least Squares, Gram-Schmidt, and
+  Eigenvalues}\label{sec:lec03}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 23/04/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Large and Sparse Matrices (Band Matrices)}
+In real physical systems, ``everything does not interact with everything.''
+Consider the 1D heat diffusion equation on a wire discretised into 10,000
+segments. The temperature at segment $i$ only directly influences its
+immediate neighbours $i-1$ and $i+1$. The interaction matrix $A$ is
+$10{,}000 \times 10{,}000$ (100 million elements), but $99.99\%$ are zero —
+only the main diagonal and two adjacent diagonals are non-zero. This is a
+\textbf{Band Matrix}.
+
+By storing and operating only on the band of width $n_b$, Gaussian
+elimination time drops from $\bigO{n^3}$ to $\bigO{n_b^2\, n}$ and memory
+from gigabytes to megabytes.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Least Squares}
+When fitting a line to noisy experimental data, we have an overdetermined
+system $Ax = b$ with more equations (data points) than unknowns. A perfect
+solution is impossible.
+
+\noindent\textbf{Physical intuition:} The columns of $A$ span the ``model
+space''. The data vector $b$ lives outside this space due to noise. The best
+parameters $x$ are found by dropping a perpendicular from $b$ onto the model
+space. The error vector $(b - Ax)$ must be orthogonal to every column of $A$:
+\[
+A^T(b - Ax) = 0 \implies \boxed{A^T A\, x = A^T b}
+\]
+These are the \textbf{Normal Equations}. Solving them minimises the squared
+error $\norm{Ax - b}^2$.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Gram-Schmidt Orthogonalization}
+Explicitly forming $A^T A$ is numerically dangerous because it squares the
+condition number of the matrix, violently amplifying floating-point
+inaccuracies. Instead, \textbf{Gram-Schmidt} orthogonalises the columns of
+$A$ directly.
+
+\noindent\textbf{Physical intuition:} For each vector $a_j$, subtract its
+projection onto all previously established orthogonal basis vectors:
+\begin{equation}
+a'_j = a_j - \frac{a_1 \cdot a_j}{a_1 \cdot a_1}\, a_1
+\end{equation}
+Repeating for all $j$ yields mutually orthogonal columns.
+
+\textbf{Connection to QR decomposition.} Gram-Schmidt is algebraically
+equivalent to a QR factorisation $A = \hat{A}R$, where $\hat{A}$ has
+orthonormal columns ($\hat{A}^T\hat{A} = I$). Substituting into the Normal
+Equations:
+\begin{equation}
+A^T A\, x = A^T b \;\implies\; Rx = \hat{A}^T b
+\end{equation}
+This upper-triangular system is solved by back-substitution in $\bigO{m^2}$,
+entirely bypassing formation of $A^T A$.
+
+\begin{tcolorbox}[colback=orange!5!white,colframe=orange!75!black,
+  title=Numerical Stability Warning: Loss of Orthogonality]
+If the columns of $A$ are nearly linearly dependent, the remainder after
+subtraction can be many orders of magnitude smaller than the original. Once
+intermediate values approach machine epsilon ($\varepsilon_{\text{mach}}
+\approx 10^{-15}$), the subtraction is dominated by floating-point noise and
+\textbf{orthogonality is silently lost}. In practice, use
+\emph{Modified Gram-Schmidt} (subtracting projections one at a time) or
+Householder reflections.
+\end{tcolorbox}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Introduction to Eigenvalues --- Jacobi Method}
+For a real symmetric matrix $A$, we seek $\lambda_i$ such that
+$A\varphi_i = \lambda_i\varphi_i$. The \textbf{Jacobi Method} applies a
+sequence of plane-rotation transformations $T^T A T$, where each $T$ is a
+Givens rotation that zeros one off-diagonal pair $(A_{pq}, A_{qp})$.
+
+\noindent\textbf{Physical intuition:} At each step, take the 2D slice of
+the $N$-dimensional matrix containing the largest off-diagonal element and
+physically rotate the coordinate system in that plane until the element
+vanishes. Convergence is guaranteed by two invariants:
+\begin{enumerate}
+    \item \textbf{Trace Invariance}: $\mathrm{Tr}(T^T A T) = \mathrm{Tr}(A)$.
+    The sum of eigenvalues never changes.
+    \item \textbf{Frobenius Norm Invariance}: $\sum_{i,j}(T^T A T)_{ij}^2 =
+    \sum_{i,j} A_{ij}^2$. Total squared weight is conserved under orthonormal
+    transformations.
+\end{enumerate}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!50!black,
+  title=Why the Algorithm Must Converge]
+The Frobenius norm is shared between diagonal and off-diagonal entries. Since
+the total is fixed, weight removed from off-diagonal must go to the diagonal.
+After each full cycle of $n(n-1)/2$ rotations:
+\begin{equation}
+S_{\text{off}}^{(k+1)} \leq S_{\text{off}}^{(k)} \cdot e^{-1}
+\end{equation}
+so $S_{\text{off}}$ decreases by at least $e^{-1}$ per cycle and convergence
+to a diagonal matrix is guaranteed.
+\end{tcolorbox}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+    \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 2.4 (Band
+    Diagonal Systems), Ch.\ 15.4 (General Linear Least Squares), Ch.\ 11.0
+    (Eigensystems Introduction).
+    \item \textit{An Introduction to Computational Physics}, Tao Pang ---
+    Ch.\ 4 (Matrix Operations).
+\end{itemize}

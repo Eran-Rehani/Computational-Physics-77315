@@ -1,0 +1,167 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 04 — Jacobi Convergence, Multidimensional Roots, and Minimization
+%% 77315 — Computational Physics
+%% Date: 26/04/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 04 — Jacobi Convergence, Multidimensional Roots, and
+  Minimization}\label{sec:lec04}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 26/04/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Jacobi Method: Convergence Rate and Complexity}
+
+\textbf{Convergence Rate per Cycle.} Define a \textbf{cycle} as one complete
+pass through all $\frac{n(n-1)}{2}$ off-diagonal element pairs. Let
+$S^{(k)} = \sum_{i \neq j} A_{ij}^2$ after $k$ cycles. Applying the
+per-rotation bound repeatedly over a full cycle:
+\begin{equation}
+S^{(1)} \leq S^{(0)} \cdot \left(1 - \frac{2}{n(n-1)}\right)^{n(n-1)/2}
+\approx S^{(0)} \cdot e^{-1}
+\end{equation}
+Each cycle reduces the off-diagonal weight by $\approx e^{-1} \approx 0.37$.
+In practice, 10 cycles is sufficient for nearly all applications.
+
+\textbf{Computational Complexity.} Each rotation modifies 2 rows and 2
+columns of $n$ elements, requiring $\sim 12$ multiplications per zero
+created. A full cycle has $\frac{n(n-1)}{2}$ rotations; for 10 cycles the
+total is $\approx 60n^3$, confirming $\bigO{n^3}$ scaling.
+
+\textbf{Tracking Eigenvectors.} Maintain the accumulated rotation matrix
+$T = T_1 T_2 \cdots T_k$ (initialised as $T = I$). After each plane rotation
+with $\cos\phi = c$, $\sin\phi = s$ on the $(p,q)$ plane, update:
+\begin{align}
+T_{r,p} &\leftarrow c\, T_{r,p} - s\, T_{r,q} \\
+T_{r,q} &\leftarrow s\, T_{r,p} + c\, T_{r,q}
+\end{align}
+At convergence the columns of $T$ are the eigenvectors $\varphi_i$.
+
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,
+  title=Optimisation: Row-Maximum Vector ($\bigO{n^4} \to \bigO{n^3}$)]
+\textbf{Naive bottleneck}: scanning the full upper-triangular part to find
+$\max_{i<j}|A_{ij}|$ costs $\bigO{n^2}$ per rotation, giving total
+$\bigO{n^4}$.
+
+\textbf{Fix}: maintain a vector $\mathtt{j\_max}[i]$ storing the column index
+of the largest off-diagonal element in row $i$. Finding the global max then
+costs $\bigO{n}$. After each rotation (which modifies rows and columns $p$
+and $q$), only rows $p$, $q$, and rows that had their max in $\{p,q\}$ need
+re-scanning — costing $\bigO{n}$ expected total per rotation. Net result:
+$\bigO{n^3}$ total.
+\end{tcolorbox}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Finding the Root of a Function in Multiple Dimensions}
+
+\noindent\textbf{Physical intuition:} In 1D, bracketing (bisection) works
+because a sign change guarantees a root. In $N$ dimensions, the zero-set of
+each component $F_i(\mathbf{x}) = 0$ is a hypersurface; roots are
+intersections of $N$ such hypersurfaces. There is no bounding box whose
+corner values can certify a root lies inside — we must use local iterative
+methods that depend sensitively on the starting point.
+
+\textbf{Multidimensional Newton-Raphson.} Construct the flat tangent
+hyperplane at the current point using the \textbf{Jacobian matrix}
+$J_{ij} = \frac{\partial F_i}{\partial x_j}$. The Newton step $\delta$
+satisfies:
+\begin{equation}
+\boxed{J\,\delta = -F(\mathbf{x})}
+\end{equation}
+This is solved by Gaussian elimination (Lecture~\ref{sec:lec02}). The new
+estimate is $\mathbf{x}_{\text{new}} = \mathbf{x} + \delta$, and the process
+repeats until $|F(\mathbf{x})|$ is acceptably small. Convergence is
+\emph{quadratic} near a root (correct digits double each iteration), but a
+poor starting point can diverge.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Line Search and Backtracking}\label{subsec:linesearch}
+
+\begin{tcolorbox}[colback=yellow!5!white,colframe=yellow!60!black,
+  title=The Blind Hiker Analogy]
+A blindfolded hiker finds the downhill direction via Newton's method but
+taking a massive step might overshoot the valley bottom and ascend the
+opposite face. Solution: define the scalar merit function
+$f(\mathbf{x}) = \frac{1}{2}F(\mathbf{x}) \cdot F(\mathbf{x})$ and take a
+step $\lambda p$. If $f(\mathbf{x}_{\text{new}}) > f(\mathbf{x})$, backtrack
+by reducing $\lambda$ using parabolic/cubic curve fitting. Every step must
+strictly lower $f$.
+\end{tcolorbox}
+
+\textbf{Descent Guarantee.} With the Newton direction $p = -J^{-1}F$:
+\begin{equation}
+\grad f \cdot p = F^T J \cdot (-J^{-1}F) = -F \cdot F < 0
+\end{equation}
+so $p$ is always a descent direction. We accept $\lambda$ once the
+\textbf{Armijo condition} is satisfied:
+\begin{equation}
+f(\mathbf{x} + \lambda p) \leq f(\mathbf{x}) + \varepsilon\,\grad f(\mathbf{x})\cdot(\lambda p),
+\qquad \varepsilon \approx 10^{-4}
+\end{equation}
+
+\textbf{Backtracking Steps.}
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,
+  title=Parabolic and Cubic Polynomial Fitting]
+\textbf{First backtrack — parabolic fit.} From $g(0)$, $g'(0) < 0$, and
+$g(1)$, the parabola minimum is at:
+\begin{equation}
+\lambda^* = -\frac{g'(0)}{2\bigl[g(1) - g(0) - g'(0)\bigr]}
+\end{equation}
+Clamped to $[0.1,\, 0.5]$ to prevent steps that are negligibly small or
+dangerously large.
+
+\textbf{Subsequent backtracks — cubic fit.} With four known values
+$g(0)$, $g'(0)$, $g(\lambda_1)$, $g(\lambda_2)$, solve for the cubic minimum:
+\begin{equation}
+\frac{1}{\lambda_1 - \lambda_2}
+\begin{pmatrix} \lambda_1^{-2} & -\lambda_2^{-2} \\ -\lambda_1^{-3} &
+\lambda_2^{-3} \end{pmatrix}
+\begin{pmatrix} g(\lambda_1) - g(0) - g'(0)\lambda_1 \\
+g(\lambda_2) - g(0) - g'(0)\lambda_2 \end{pmatrix}
+= \begin{pmatrix} a \\ b \end{pmatrix}
+\end{equation}
+Minimum at $\lambda^* = \bigl(-b + \sqrt{b^2 - 3a\,g'(0)}\bigr)/(3a)$,
+again clamped.
+\end{tcolorbox}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Finding a Minimum in One Dimension --- Golden Section Search}
+To bracket the minimum of a 1D function without derivatives, maintain three
+points $a < b < c$. Evaluate a new point $x$ inside the larger interval to
+shrink the bracket. The mathematically optimal placement guarantees equal
+fractional reduction regardless of outcome, forcing the intervals to obey
+the \textbf{Golden Ratio}:
+\begin{equation}
+w = \frac{3 - \sqrt{5}}{2} \approx 0.382
+\end{equation}
+By always choosing $x$ exactly $38.2\%$ into the larger segment, the bracket
+shrinks optimally at every step.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Minimization in a Multidimensional Space}
+When finding a multidimensional minimum, gradient descent leads to a flat
+spot ($\grad f = 0$). To confirm it is a minimum (not a saddle point), the
+landscape must curve upward in \emph{every} direction: the \textbf{Hessian
+Matrix} $H_{ij} = \frac{\partial^2 f}{\partial x_i \partial x_j}$ must be
+\textbf{Positive Definite}.
+
+\noindent\textbf{Efficient check:} Apply Gaussian elimination to $H$. If and
+only if every diagonal pivot $B_{ii} > 0$ during elimination, the matrix is
+positive definite, confirming a true minimum. (Computing all eigenvalues
+would cost $\bigO{n^3}$ with a large prefactor; this check is cheaper and
+equally conclusive.)
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+    \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 11.1
+    (Jacobi Transformations), Ch.\ 9.7 (Globally Convergent Methods for
+    Nonlinear Systems), Ch.\ 10.1 (Golden Section Search).
+    \item \textit{Computational Physics}, Mark Newman --- Ch.\ 6 (Solution of
+    Linear and Nonlinear Equations).
+\end{itemize}

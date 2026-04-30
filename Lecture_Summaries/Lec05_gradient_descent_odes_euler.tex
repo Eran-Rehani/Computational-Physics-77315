@@ -1,0 +1,266 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 05 — Gradient Descent, Newton's Optimization, and
+%%              Introduction to ODEs with Euler's Method
+%% 77315 — Computational Physics
+%% Date: 30/04/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 05 — Gradient Descent, Newton's Optimization Method, and
+  Introduction to ODEs}\label{sec:lec05}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 30/04/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+This lecture transitions from root-finding (Lecture~\ref{sec:lec04}) to
+\emph{optimization} — finding a point where the gradient vanishes — and then
+opens the topic of \emph{numerical integration of ordinary differential
+equations}. The two topics are related: the gradient-descent step is itself
+governed by a continuous-time ODE, and the Euler method we derive here is the
+simplest possible discretisation of any such ODE.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Gradient Descent}
+
+\noindent\textbf{Physical intuition:} Imagine a blindfolded hiker on a
+multidimensional landscape trying to reach the lowest valley. At each step
+the hiker measures the slope in every direction (the gradient $\grad f$) and
+steps in the \emph{opposite} direction — directly downhill. This is gradient
+descent.
+
+\subsubsection{Derivation via Taylor Expansion}
+Let $f : \mathbb{R}^N \to \mathbb{R}$ be the objective function. Expand to
+first order around the current point $\mathbf{x}_0$:
+\begin{equation}
+f(\mathbf{x}_0 + \delta) \approx f(\mathbf{x}_0) + (\grad f)\cdot\delta
+\end{equation}
+To decrease $f$ as rapidly as possible, choose $\delta$ antiparallel to the
+gradient:
+\begin{equation}
+\boxed{\delta = -\alpha\,\grad f(\mathbf{x}_0)}
+\end{equation}
+where $\alpha > 0$ is the \textbf{step size} (learning rate). The update rule
+is therefore:
+\begin{equation}
+\mathbf{x}_{n+1} = \mathbf{x}_n - \alpha\,\grad f(\mathbf{x}_n)
+\end{equation}
+
+\subsubsection{Step Size Selection via 1D Line Search}
+Choosing $\alpha$ is non-trivial:
+\begin{itemize}
+    \item Too large: the update overshoots the minimum and $f$ may increase.
+    \item Too small: convergence is extremely slow.
+\end{itemize}
+\noindent\textbf{Optimal strategy:} treat $\alpha$ as a 1D optimisation
+problem. Define $g(\alpha) = f(\mathbf{x}_n - \alpha\,\grad f)$ and minimise
+it using Golden Section Search (Lecture~\ref{sec:lec04},
+\S\ref{subsec:linesearch}). This \emph{exact line search} is expensive but
+guarantees the best step along the descent direction. In practice, the
+\emph{backtracking} (Armijo) criterion from Lecture~\ref{sec:lec04} is used
+instead — it is much cheaper and still ensures strict descent.
+
+\subsubsection{Convergence Properties and Limitations}
+\begin{itemize}
+    \item Gradient descent converges to a \textbf{local} minimum, not
+    necessarily the global one. The algorithm has no mechanism to escape a
+    local basin.
+    \item Near the minimum, convergence is \emph{linear} (error decreases by
+    a constant factor per step). In contrast to Newton's method (below),
+    which is quadratic, gradient descent can require many more steps in
+    poorly scaled or ill-conditioned problems.
+    \item The method is inefficient in narrow, elongated valleys (ravines):
+    the gradient oscillates across the valley rather than proceeding along it.
+\end{itemize}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Newton's Method for Optimization (Second-Order Methods)}
+
+\noindent\textbf{Physical intuition:} Gradient descent uses only the slope
+(first derivative) of the landscape. Newton's method adds the \emph{curvature}
+(second derivative) — it fits a local paraboloid to the landscape and jumps
+directly to its bottom, rather than crawling downhill.
+
+\subsubsection{Second-Order Taylor Expansion and the Hessian}
+Expand $f$ to second order around $\mathbf{x}_0$:
+\begin{equation}
+f(\mathbf{x}_0 + \delta)
+\approx f(\mathbf{x}_0) + (\grad f)\cdot\delta
++ \tfrac{1}{2}\,\delta^T \Hess\,\delta
+\end{equation}
+where the \textbf{Hessian matrix} $\Hess$ has entries
+\begin{equation}
+H_{ij} = \frac{\partial^2 f}{\partial x_i\,\partial x_j}
+\end{equation}
+The local paraboloid has a unique minimum where its gradient vanishes:
+\begin{equation}
+\grad_\delta\bigl[(\grad f)\cdot\delta + \tfrac{1}{2}\,\delta^T\Hess\,\delta\bigr]
+= \grad f + \Hess\,\delta = 0
+\end{equation}
+This gives the \textbf{Newton step}:
+\begin{equation}
+\boxed{\Hess\,\delta = -\grad f}
+\end{equation}
+
+\subsubsection{Solving the Newton System}
+The equation $\Hess\,\delta = -\grad f$ is a square linear system of size
+$N\times N$, solved by Gaussian elimination in $\bigO{N^3}$ operations —
+exactly the same infrastructure as multidimensional Newton-Raphson for roots
+(Lecture~\ref{sec:lec04}).
+
+The new iterate is $\mathbf{x}_{\text{new}} = \mathbf{x} + \delta$. Near
+the minimum, convergence is \emph{quadratic}: the number of correct digits
+roughly doubles each iteration.
+
+\subsubsection{Positive Definiteness Condition}
+For the paraboloid to have a minimum (not a maximum or saddle point), the
+Hessian must be \textbf{Positive Definite} (PD): all eigenvalues
+$\lambda_i > 0$, equivalently $\mathbf{v}^T\Hess\,\mathbf{v} > 0$ for all
+non-zero $\mathbf{v}$.
+
+If $\Hess$ is not PD at the current point, the Newton step points toward a
+saddle or maximum — we are not near a minimum. In this case, one falls back
+to gradient descent or adds a positive multiple of the identity matrix
+(\emph{Levenberg-Marquardt regularisation}) to make $\Hess + \mu I$ PD.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Checking Positive Definiteness via Gaussian Elimination}
+
+\noindent\textbf{Physical intuition:} Computing all $N$ eigenvalues of $\Hess$
+to verify positivity costs $\bigO{N^3}$ with a large prefactor. Gaussian
+elimination on a symmetric matrix offers an equally conclusive check at lower
+cost.
+
+\subsubsection{The Criterion}
+Apply Gaussian elimination (without row swaps, since $\Hess$ is symmetric)
+to $\Hess$. At each step, divide the $k$-th row by the diagonal pivot
+$B_{kk}$. The key theorem is:
+
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,
+  title=Positive Definiteness via Gaussian Elimination]
+A real symmetric matrix $\Hess$ is Positive Definite \emph{if and only if}
+all diagonal pivot elements $B_{kk}$ remain strictly positive during
+Gaussian elimination without pivoting.
+
+\textbf{Why:} The pivots $B_{11}, B_{22}, \ldots, B_{NN}$ are the ratios of
+successive leading principal minors:
+\[
+B_{kk} = \frac{\det(\Hess_k)}{\det(\Hess_{k-1})}
+\]
+By Sylvester's criterion, $\Hess$ is PD $\iff$ all leading principal minors
+are positive $\iff$ all pivots are positive. If any $B_{kk} \leq 0$, the
+matrix is not PD and we are not at a (local) minimum.
+\end{tcolorbox}
+
+\subsubsection{Connection to the Minimization Check (Lecture~\ref{sec:lec04})}
+In Lecture~\ref{sec:lec04} we noted that checking positive definiteness of
+$\Hess$ via Gaussian elimination is cheaper than computing eigenvalues. The
+current lecture provides the algorithmic detail: run standard Gaussian
+elimination on $\Hess$ (which is symmetric, so only the upper triangle need
+be stored) and inspect the diagonal pivots. Cost: $\bigO{N^3/6}$, a factor of
+6 cheaper than full LU with the same asymptotic scaling.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Ordinary Differential Equations: Problem Setup}
+
+\noindent\textbf{Physical intuition:} Almost all of classical physics is
+expressed as ODEs: Newton's second law, circuit equations, orbital mechanics.
+The goal is to integrate these equations forward in time to find the
+trajectory $y(x)$ given an initial condition.
+
+\subsubsection{Standard Form: First-Order System}
+The general first-order ODE is:
+\begin{equation}
+\frac{dy}{dx} = f\bigl(x,\, y(x)\bigr), \qquad y(x_0) = y_0
+\end{equation}
+Higher-order equations are reduced to this form by introducing auxiliary
+variables. Consider Newton's second law:
+\begin{equation}
+m\,\ddot{r} = F(t, r, \dot{r})
+\end{equation}
+Define $v = \dot{r}$. This becomes a \emph{system} of two first-order ODEs:
+\begin{align}
+\dot{r} &= v \\
+\dot{v} &= \frac{F(t, r, v)}{m}
+\end{align}
+In vector form $\mathbf{y} = (r, v)^T$:
+\begin{equation}
+\frac{d\mathbf{y}}{dt} = \mathbf{f}(t, \mathbf{y})
+\end{equation}
+All standard numerical ODE solvers work on this canonical first-order system
+form, so the reduction is not merely a notational convenience — it is the
+required input format.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Euler's Method}
+
+\noindent\textbf{Physical intuition:} Euler's method is the simplest possible
+numerical ODE integrator. At each step, assume the derivative $f(x_n, y_n)$
+is constant over the interval $[x_n, x_{n+1}]$ and use it to extrapolate
+linearly.
+
+\subsubsection{Derivation}
+Discretise the domain into uniform steps of size $h$:
+$x_n = x_0 + n\,h$. Replace the derivative by its forward-difference
+approximation:
+\begin{equation}
+\frac{y_{n+1} - y_n}{h} \approx f(x_n, y_n)
+\end{equation}
+Solving for $y_{n+1}$:
+\begin{equation}
+\boxed{y_{n+1} = y_n + h\,f(x_n,\, y_n)}
+\end{equation}
+
+\subsubsection{Error Analysis}
+\textbf{Local (per-step) error.} Expand the exact solution in Taylor series:
+\begin{equation}
+y(x_{n+1}) = y(x_n) + h\,y'(x_n) + \frac{h^2}{2}\,y''(x_n) + \bigO{h^3}
+\end{equation}
+Since $y'(x_n) = f(x_n, y_n)$, the Euler update matches the first two terms.
+The local truncation error is therefore:
+\begin{equation}
+e_{\text{local}} = \frac{h^2}{2}\,y''(x_n) + \bigO{h^3} = \bigO{h^2}
+\end{equation}
+
+\textbf{Global error.} Over the full domain $[x_0, X]$ there are $n =
+(X - x_0)/h$ steps, so errors accumulate:
+\begin{equation}
+e_{\text{global}} \approx n \cdot e_{\text{local}} = \frac{X - x_0}{h}
+\cdot \bigO{h^2} = \bigO{h}
+\end{equation}
+Euler's method is therefore a \textbf{first-order} method: halving the step
+size halves the global error.
+
+\begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,
+  title=Why Euler's Method is Rarely Used in Practice]
+Although simple and instructive, Euler's method suffers from two problems:
+\begin{enumerate}
+    \item \textbf{Accuracy}: Only first-order global accuracy. To achieve
+    $10^{-6}$ absolute error over unit interval requires $h \sim 10^{-6}$,
+    i.e., one million evaluations of $f$.
+    \item \textbf{Stability}: For stiff equations (where $f$ has a large
+    Lipschitz constant), the step size must satisfy $h < 2/|f_y|$ or the
+    error grows exponentially. This can force $h$ to be astronomically small
+    even when the solution itself is smooth.
+\end{enumerate}
+Higher-order methods (Runge-Kutta, Adams-Bashforth) achieve much better
+accuracy per function evaluation. The Runge-Kutta 4 (RK4) method, covered in
+the next lecture, achieves $\bigO{h^4}$ local error ($\bigO{h^4}$ global)
+with only 4 evaluations of $f$ per step.
+\end{tcolorbox}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+    \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 10.6
+    (Gradient Methods; Conjugate Gradients), Ch.\ 16.1 (Runge-Kutta Method;
+    Euler as special case).
+    \item \textit{Computational Physics}, Mark Newman --- Ch.\ 8 (Ordinary
+    Differential Equations).
+    \item \textit{An Introduction to Computational Physics}, Tao Pang ---
+    Ch.\ 3 (Ordinary Differential Equations).
+\end{itemize}

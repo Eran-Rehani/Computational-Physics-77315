@@ -1,0 +1,39 @@
+\ProvidesPackage{preamble}
+
+%% ── Core packages ────────────────────────────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage[margin=1.8cm]{geometry}
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue]{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{subfiles}
+\usepackage{siunitx}
+\usepackage[most]{tcolorbox}
+
+%% ── Page style ───────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small 77315 — Computational Physics}
+\rhead{\small \thesubsection}
+\cfoot{\thepage}
+
+%% ── Theorem environments ─────────────────────────────────────────────────────
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{example}{Example}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+%% ── General math macros ──────────────────────────────────────────────────────
+\newcommand{\bigO}[1]{\mathcal{O}\!\left(#1\right)}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\abs}[1]{\left|#1\right|}
+\newcommand{\grad}{\nabla}
+\newcommand{\Hess}{\mathbf{H}}
+\newcommand{\Jac}{\mathbf{J}}
+\newcommand{\eps}{\varepsilon}

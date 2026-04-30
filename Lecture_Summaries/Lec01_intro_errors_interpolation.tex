@@ -1,0 +1,172 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 01 — Introduction: Roundoff Errors, Numerical
+%%              Differentiation, and Interpolation
+%% 77315 — Computational Physics
+%% Date: 26/03/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 01 — Introduction: Roundoff Errors, Numerical
+  Differentiation, and Interpolation}\label{sec:lec01}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 26/03/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+
+Computational physics combines numerical analysis methods to solve physical
+problems. Historically, physics progressed through a binary of theoretical
+physics (creating mathematical models) and experimental physics (measuring
+reality). Today, the computational approach serves as a formidable third
+branch. By leveraging the immense processing power of computers, we can
+solve complex models (such as nonlinear differential equations with no
+analytical solutions) and perform macroscopic simulations of many-body
+systems that would be otherwise impossible to track.
+
+When translating pure mathematics into computer code, we must abandon the
+notion of ``infinite precision.'' Three main factors must always be
+considered:
+\begin{enumerate}
+    \item \textbf{Roundoff Errors}: Inaccuracies due to the finite memory
+    computers use to store numbers.
+    \item \textbf{Truncation Errors (Accuracy)}: Inaccuracies arising from
+    using a finite mathematical approximation (like stopping a Taylor series
+    early).
+    \item \textbf{Stability}: The tendency of an algorithm to either dampen
+    or exponentially amplify these microscopic errors over time.
+\end{enumerate}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Errors, Accuracy, and Stability}
+
+\subsubsection{Catastrophic Cancellation and Roundoff Errors}
+Computers represent real numbers using a limited number of bits. A common
+representation is 4 bytes (Float32, yielding $\sim 7$ decimal digits of
+precision) or 8 bytes (Float64, yielding $\sim 16$ decimal digits).
+
+Because of this finite representation, every basic arithmetic operation
+introduces a tiny relative error. While this is usually negligible, a severe
+problem known as \textbf{catastrophic cancellation} occurs when subtracting
+two very close numbers.
+
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,
+  title=Pedagogical Example: The Quadratic Formula]
+Consider the quadratic equation $x^2 - 1000x + 0.001 = 0$. Here, $b = 500$
+and $c = 0.001$. The standard quadratic formula gives the roots as
+$x = b \pm \sqrt{b^2 - c}$.
+
+If we calculate the smaller root using subtraction:
+$x_{\text{small}} = 500 - \sqrt{250000 - 0.001} \approx 500 - 499.999999 =
+0.000001$.
+
+If our computer only has 7 digits of precision (Float32),
+$\sqrt{250000 - 0.001}$ will be rounded to exactly $500.0000$. The
+subtraction $500.0000 - 500.0000$ yields $0$. We have completely lost the
+true answer due to catastrophic cancellation!
+
+\textbf{The elegant solution}: Multiply the numerator and denominator by the
+conjugate $b + \sqrt{b^2-c}$. This transforms the formula to
+$x_{\text{small}} = \frac{c}{b + \sqrt{b^2 - c}}$.
+Now: $x_{\text{small}} = \frac{0.001}{500 + 500} = \frac{0.001}{1000} =
+10^{-6}$. By avoiding the subtraction of close numbers, we maintain perfect
+precision.
+\end{tcolorbox}
+
+\subsubsection{Truncation Error and Stability}
+Truncation error is the difference between the exact mathematical formula and
+the approximated algorithm. For example, a Taylor series is infinite, but a
+computer can only sum $N$ terms. The discarded terms constitute the truncation
+error.
+
+\textbf{Stability} dictates whether an algorithm is usable. An algorithm is
+unstable if tiny roundoff or truncation errors grow exponentially as the
+computation proceeds.
+
+\begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,
+  title=Intuitive Analogy: The Golden Mean Recursion]
+Consider calculating the powers of the ``Golden Mean'' $\phi =
+\frac{\sqrt{5}-1}{2} \approx 0.618$. Mathematically, $\phi$ satisfies the
+recurrence relation: $\phi^{n+1} = \phi^{n-1} - \phi^n$. This seems like a
+brilliantly fast way to compute $\phi^{100}$ without multiplication!
+
+However, this linear recurrence relation has two mathematical roots:
+$\phi_1 \approx 0.618$ and $\phi_2 = \frac{-\sqrt{5}-1}{2} \approx -1.618$.
+Even if we start with the exact values for $n=1, 2$, the tiny roundoff error
+introduced by the computer acts as a ``seed'' for the second root. Because
+$|\phi_2| > 1$, its contribution grows exponentially. By $n=50$, the
+parasitic $\phi_2$ term completely dominates, and the algorithm blows up to
+infinity. This is the hallmark of numerical instability.
+\end{tcolorbox}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Numerical Differentiation}
+How do we teach a computer to calculate a derivative,
+$\lim_{h \to 0} \frac{f(x+h)-f(x)}{h}$? We cannot set $h=0$, nor can we
+make $h$ infinitely small due to roundoff errors.
+
+If we have a discrete grid of points $x_n = x_0 + nh$, we can approximate
+derivatives using Taylor expansions:
+\begin{align*}
+f(x_0 + h) &= f_0 + h f' + \frac{h^2}{2} f'' + \frac{h^3}{6} f''' +
+\mathcal{O}(h^4) \\
+f(x_0 - h) &= f_0 - h f' + \frac{h^2}{2} f'' - \frac{h^3}{6} f''' +
+\mathcal{O}(h^4)
+\end{align*}
+Subtracting the second from the first cancels the $f''$ term, yielding the
+\textbf{Central Difference Formula}:
+\begin{equation}
+f' = \frac{f_{+1} - f_{-1}}{2h} + \mathcal{O}(h^2)
+\end{equation}
+Geometrically, instead of drawing a secant line from $x$ to $x+h$ (which is
+biased), we draw a secant line from $x-h$ to $x+h$, which perfectly balances
+the slope around $x$.
+
+\textbf{The Step-Size Dilemma.} If we make $h$ large, the Taylor
+approximation fails (truncation error $e_t \sim h^2 f'''$). If we make $h$
+microscopic, catastrophic cancellation destroys the numerator (roundoff error
+$e_r \sim \frac{\eps_f f}{h}$). Minimising $E(h) = \frac{\eps_f f}{h} +
+h^2 f'''$ yields:
+\begin{equation}
+h_{\text{opt}} \sim \sqrt[3]{\frac{3\,\eps_f\, f}{f'''}}
+\end{equation}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Interpolation}
+Interpolation is the art of reading ``between the lines'' of a discrete
+dataset.
+\begin{itemize}
+    \item \textbf{Lagrange Interpolation}: Fits a single global polynomial of
+    degree $N-1$ through exactly $N$ points. High-degree polynomials suffer
+    from \textbf{Runge's Phenomenon}: they oscillate violently at the edges
+    of the interval.
+    \item \textbf{Cubic Splines}: Piecewise polynomials that enforce
+    continuity of the function value, first derivative, and second derivative
+    across each knot. The result is a stable tridiagonal system.
+\end{itemize}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!50!black,
+  title=The Tridiagonal System for Cubic Splines]
+Let $h_i = x_{i+1} - x_i$ and $m_i = S''(x_i)$ be the unknown second
+derivative at each knot. Enforcing continuity of $S$, $S'$, and $S''$ yields:
+\begin{equation}
+h_i\, m_{i-1} + 2(h_i + h_{i+1})\, m_i + h_{i+1}\, m_{i+1} =
+6\left(\frac{y_{i+1}-y_i}{h_{i+1}} - \frac{y_i - y_{i-1}}{h_i}\right)
+\end{equation}
+With natural boundary conditions $m_0 = m_N = 0$, this gives an
+$(N-1)\times(N-1)$ tridiagonal system solvable in $\bigO{N}$ — far cheaper
+than $\bigO{N^3}$ Gaussian elimination.
+\end{tcolorbox}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+    \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 1
+    (Preliminaries on Errors), Ch.\ 5.3 (Polynomial Interpolation),
+    Ch.\ 5.7 (Numerical Derivatives).
+    \item \textit{Computational Physics}, Mark Newman --- Ch.\ 4 (Accuracy
+    and Speed), Ch.\ 5 (Integrals and Derivatives).
+\end{itemize}
