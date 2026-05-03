@@ -1,0 +1,687 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 06 — Higher-Order ODE Methods, Adaptive Steps, and Stability
+%% 77315 — Computational Physics
+%% Date: 03/05/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 06 — Higher-Order ODE Methods, Adaptive Steps, and
+  Stability}\label{sec:lec06}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 03/05/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+Lecture~\ref{sec:lec05} introduced Euler's method as the simplest numerical
+integrator for a first-order ordinary differential equation
+$y'(x)=f(x,y)$. Euler's method is useful pedagogically, but it is rarely
+efficient: its local truncation error is only $\bigO{h^2}$ and its global
+error is only $\bigO{h}$. This lecture develops two systematic routes to
+higher accuracy:
+\begin{itemize}
+    \item \textbf{multi-step methods}, which reuse previously computed values
+    of $f$; and
+    \item \textbf{Runge-Kutta methods}, which compute several slopes inside
+    the current step.
+\end{itemize}
+The lecture then explains adaptive step-size control and closes with the
+central stability lesson: explicit methods can become unstable even when the
+exact solution is perfectly well behaved, while implicit and semi-implicit
+methods often improve stability at the cost of solving algebraic equations.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Taylor Expansion Beyond Euler}\label{subsec:lec06:taylor}
+
+\subsubsection*{Physical Motivation}
+Euler's method assumes that the slope measured at the beginning of the step
+remains constant throughout the whole interval $[x_n,x_{n+1}]$. If the true
+slope changes noticeably during the step, this straight-line extrapolation
+misses the curvature of the solution. The most direct repair is therefore to
+keep more terms in the Taylor expansion of the exact solution.
+
+Let $h=x_{n+1}-x_n$ be the step size, $y_n$ the numerical approximation to
+$y(x_n)$, and
+\begin{equation}
+    y'(x)=f(x,y(x)).
+    \label{eq:lec06:ode-standard}
+\end{equation}
+Expanding the exact solution around $x_n$ gives
+\begin{equation}
+    y(x_{n+1})
+    = y(x_n)+h\,y'(x_n)+\frac{h^2}{2}\,y''(x_n)+\bigO{h^3}.
+    \label{eq:lec06:taylor-solution}
+\end{equation}
+The first derivative is fixed by the differential equation:
+\begin{equation}
+    y'(x_n)=f(x_n,y_n).
+    \label{eq:lec06:first-derivative}
+\end{equation}
+For the second derivative we must differentiate $f(x,y(x))$ along the
+solution curve. By the chain rule,
+\begin{equation}
+    y''(x)
+    = \frac{d}{dx}f(x,y(x))
+    = \frac{\partial f}{\partial x}(x,y)
+      +\frac{\partial f}{\partial y}(x,y)\,\frac{dy}{dx}.
+    \label{eq:lec06:chain-rule}
+\end{equation}
+Using again $dy/dx=f(x,y)$,
+\begin{equation}
+    y''(x)
+    = f_x(x,y)+f_y(x,y)\,f(x,y),
+    \label{eq:lec06:second-derivative}
+\end{equation}
+where $f_x=\partial f/\partial x$ and $f_y=\partial f/\partial y$. Therefore
+a second-order Taylor method is
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    = y_n+h\,f_n+\frac{h^2}{2}\left(f_{x,n}+f_{y,n}f_n\right)}
+    \label{eq:lec06:taylor-method}
+\end{equation}
+with $f_n=f(x_n,y_n)$.
+
+\textit{Physical significance:} the Taylor method improves Euler by adding
+the curvature of the trajectory, but it requires derivatives of $f$ itself,
+which may be unavailable or expensive in realistic simulations.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Adams-Bashforth Explicit Multi-Step Methods}
+\label{subsec:lec06:adams-bashforth}
+
+\subsubsection*{Physical Motivation}
+Instead of differentiating $f$, we can reuse information already collected
+while integrating. If $f$ was known at $x_{n-1}$ and $x_n$, then the change
+of slope between those points gives a cheap estimate of how $f$ will behave
+over the next step. This is useful when evaluating $f$ is costly but stored
+past values are essentially free.
+
+The exact integral form of the ODE is
+\begin{equation}
+    y_{n+1}
+    = y_n+\int_{x_n}^{x_{n+1}} f(x,y(x))\,dx.
+    \label{eq:lec06:integral-form}
+\end{equation}
+The Adams-Bashforth idea is to approximate the integrand over
+$[x_n,x_{n+1}]$ by extrapolating from earlier values
+\begin{equation}
+    f_j=f(x_j,y_j),
+    \qquad x_j=x_0+jh.
+    \label{eq:lec06:fj-definition}
+\end{equation}
+
+\subsubsection{Two-Step Adams-Bashforth Method}
+Use a linear extrapolation through $(x_{n-1},f_{n-1})$ and $(x_n,f_n)$:
+\begin{equation}
+    f(x)\approx f_n+\frac{x-x_n}{h}\left(f_n-f_{n-1}\right).
+    \label{eq:lec06:linear-extrapolation}
+\end{equation}
+Substitute this into Eq.~\eqref{eq:lec06:integral-form}. The first term gives
+\begin{equation}
+    \int_{x_n}^{x_{n+1}} f_n\,dx=h f_n,
+    \label{eq:lec06:ab2-integral-first}
+\end{equation}
+and the correction term gives
+\begin{equation}
+    \int_{x_n}^{x_{n+1}}
+    \frac{x-x_n}{h}\left(f_n-f_{n-1}\right)\,dx
+    =\frac{h}{2}\left(f_n-f_{n-1}\right).
+    \label{eq:lec06:ab2-integral-second}
+\end{equation}
+Therefore
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    = y_n+h\left(\frac{3}{2}f_n-\frac{1}{2}f_{n-1}\right)}
+    \label{eq:lec06:ab2}
+\end{equation}
+and the local truncation error is $\bigO{h^3}$.
+
+\textit{Physical significance:} Adams-Bashforth gains one order over Euler
+without evaluating $f$ at a new intermediate point; it pays for this by
+requiring one previous step.
+
+\subsubsection{Four-Step Adams-Bashforth Method}
+Using more past points means fitting a higher-degree interpolating polynomial
+to the old values of $f$ and integrating that polynomial. With four past
+values the standard formula is
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    =y_n+\frac{h}{24}\left(
+    55f_n-59f_{n-1}+37f_{n-2}-9f_{n-3}
+    \right)}
+    \label{eq:lec06:ab4}
+\end{equation}
+with local truncation error $\bigO{h^5}$.
+
+\textit{Physical significance:} high-order Adams-Bashforth methods can be
+very efficient for smooth problems with constant step size, because after the
+startup phase each new step needs only one fresh evaluation of $f$.
+
+The price is that a $k$-step method cannot start by itself. For example,
+Eq.~\eqref{eq:lec06:ab4} needs $f_n,f_{n-1},f_{n-2},f_{n-3}$. The first few
+values must be generated by another method, commonly Euler with very small
+steps or a Runge-Kutta method.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Implicit Adams Methods}
+\label{subsec:lec06:adams-moulton}
+
+\subsubsection*{Physical Motivation}
+The Adams-Bashforth methods look only backward. A more balanced estimate of
+the integral also uses information at the end of the interval,
+$x_{n+1}$. This usually improves accuracy and stability, but it creates an
+implicit equation because the unknown $y_{n+1}$ appears inside
+$f(x_{n+1},y_{n+1})$.
+
+The simplest implicit formula averages the slope at the beginning and at the
+end of the step:
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    =y_n+\frac{h}{2}\left(f_n+f_{n+1}\right)}
+    \label{eq:lec06:trapezoidal-method}
+\end{equation}
+where $f_{n+1}=f(x_{n+1},y_{n+1})$. This is the trapezoidal method and has
+local truncation error $\bigO{h^3}$.
+
+\textit{Physical significance:} using the future slope makes the step less
+biased toward the beginning of the interval, which improves accuracy and
+often gives better stability.
+
+For a linear equation of the form
+\begin{equation}
+    y'=g(x)y,
+    \label{eq:lec06:linear-ode-g}
+\end{equation}
+Eq.~\eqref{eq:lec06:trapezoidal-method} can be solved explicitly. We write
+\begin{equation}
+    y_{n+1}
+    =y_n+\frac{h}{2}\left(g(x_n)y_n+g(x_{n+1})y_{n+1}\right).
+    \label{eq:lec06:trapezoidal-linear-start}
+\end{equation}
+Move the unknown term to the left:
+\begin{equation}
+    \left(1-\frac{h}{2}g(x_{n+1})\right)y_{n+1}
+    =\left(1+\frac{h}{2}g(x_n)\right)y_n.
+    \label{eq:lec06:trapezoidal-linear-solve}
+\end{equation}
+Thus
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    =
+    \frac{1+\frac{h}{2}g(x_n)}
+         {1-\frac{h}{2}g(x_{n+1})}\,y_n}
+    \label{eq:lec06:trapezoidal-linear-result}
+\end{equation}
+
+\textit{Physical significance:} for linear problems, an implicit step can
+often be rewritten as a simple algebraic update; for nonlinear problems it
+usually requires a root-finding procedure such as Newton-Raphson.
+
+A higher-order implicit Adams-Moulton formula using
+$f_{n+1},f_n,f_{n-1}$ is
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    =y_n+\frac{h}{12}\left(5f_{n+1}+8f_n-f_{n-1}\right)}
+    \label{eq:lec06:am3}
+\end{equation}
+with local truncation error $\bigO{h^4}$. With one more previous point,
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    =y_n+\frac{h}{24}\left(9f_{n+1}+19f_n-5f_{n-1}+f_{n-2}\right)}
+    \label{eq:lec06:am4}
+\end{equation}
+with local truncation error $\bigO{h^5}$.
+
+\textit{Physical significance:} Adams-Moulton methods are accurate and
+stable, but because they are implicit they are most convenient when paired
+with a predictor.
+
+\subsubsection{Predictor-Corrector Use}
+A practical compromise is:
+\begin{enumerate}
+    \item predict $y_{n+1}^{*}$ with an explicit Adams-Bashforth formula;
+    \item evaluate $f_{n+1}^{*}=f(x_{n+1},y_{n+1}^{*})$;
+    \item correct the result with an Adams-Moulton formula.
+\end{enumerate}
+For example, Eq.~\eqref{eq:lec06:ab4} can predict the endpoint, and
+Eq.~\eqref{eq:lec06:am4} can correct it:
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    =y_n+\frac{h}{24}
+    \left(9f_{n+1}^{*}+19f_n-5f_{n-1}+f_{n-2}\right)}
+    \label{eq:lec06:predictor-corrector}
+\end{equation}
+
+\textit{Physical significance:} predictor-corrector methods keep most of the
+low cost of explicit multi-step integration while importing some of the
+accuracy and stability advantages of implicit formulas.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Runge-Kutta Methods}\label{subsec:lec06:runge-kutta}
+
+\subsubsection*{Physical Motivation}
+Multi-step methods assume that the previously sampled values of $f$ remain a
+good guide to the next interval. This works well for smooth solutions with
+constant $h$, but it is awkward when the step size must change or when the
+slope varies sharply in a localized region. Runge-Kutta methods solve this by
+sampling several slopes inside the current step only.
+
+\subsubsection{Second-Order Midpoint Method}
+Start with the slope at the beginning:
+\begin{equation}
+    k_1=h\,f(x_n,y_n).
+    \label{eq:lec06:rk2-k1}
+\end{equation}
+Use it only to estimate the midpoint value:
+\begin{equation}
+    y\left(x_n+\frac{h}{2}\right)
+    \approx y_n+\frac{k_1}{2}.
+    \label{eq:lec06:rk2-midpoint-estimate}
+\end{equation}
+Now evaluate the slope at that midpoint:
+\begin{equation}
+    k_2=h\,f\left(x_n+\frac{h}{2},\,y_n+\frac{k_1}{2}\right).
+    \label{eq:lec06:rk2-k2}
+\end{equation}
+The update is
+\begin{equation}
+    \boxed{
+    y_{n+1}=y_n+k_2}
+    \label{eq:lec06:rk2-update}
+\end{equation}
+with local truncation error $\bigO{h^3}$.
+
+\textit{Physical significance:} RK2 replaces Euler's beginning-of-step slope
+by a midpoint slope, so it captures the leading curvature of the trajectory
+without needing analytic derivatives of $f$.
+
+\subsubsection{Third-Order Runge-Kutta from Simpson's Rule}
+Simpson's rule suggests weighting the beginning, middle, and end of the
+interval as $1:4:1$. One third-order Runge-Kutta construction is
+\begin{align}
+    k_1 &= h\,f(x_n,y_n),
+    \label{eq:lec06:rk3-k1}\\
+    k_2 &= h\,f\left(x_n+\frac{h}{2},\,y_n+\frac{k_1}{2}\right),
+    \label{eq:lec06:rk3-k2}\\
+    k_3 &= h\,f\left(x_n+h,\,y_n+2k_2-k_1\right).
+    \label{eq:lec06:rk3-k3}
+\end{align}
+The update is
+\begin{equation}
+    \boxed{
+    y_{n+1}=y_n+\frac{1}{6}\left(k_1+4k_2+k_3\right)}
+    \label{eq:lec06:rk3-update}
+\end{equation}
+with local truncation error $\bigO{h^4}$.
+
+\textit{Physical significance:} RK3 uses three internally sampled slopes to
+imitate a high-order quadrature rule for the integral of $f$ over the step.
+
+\subsubsection{Classical Fourth-Order Runge-Kutta}
+The most widely used basic ODE solver in computational physics is classical
+RK4:
+\begin{align}
+    k_1 &= h\,f(x_n,y_n),
+    \label{eq:lec06:rk4-k1}\\
+    k_2 &= h\,f\left(x_n+\frac{h}{2},\,y_n+\frac{k_1}{2}\right),
+    \label{eq:lec06:rk4-k2}\\
+    k_3 &= h\,f\left(x_n+\frac{h}{2},\,y_n+\frac{k_2}{2}\right),
+    \label{eq:lec06:rk4-k3}\\
+    k_4 &= h\,f(x_n+h,\,y_n+k_3).
+    \label{eq:lec06:rk4-k4}
+\end{align}
+Then
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    =y_n+\frac{1}{6}\left(k_1+2k_2+2k_3+k_4\right)}
+    \label{eq:lec06:rk4-update}
+\end{equation}
+with local truncation error $\bigO{h^5}$ and global error $\bigO{h^4}$.
+
+\textit{Physical significance:} RK4 is often the best first choice for smooth
+non-stiff ODEs: it is accurate, self-starting, and does not require storing
+old steps.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Adaptive Step-Size Control}\label{subsec:lec06:adaptive}
+
+\subsubsection*{Physical Motivation}
+A fixed step size wastes work in calm regions and may fail in rapidly
+changing regions. A good integrator should take large steps when the solution
+is smooth and automatically shrink the step when the local error estimate
+becomes too large.
+
+Suppose we integrate from $a$ to $b$ and want a total allowed absolute error
+$\eps$. During one attempted step of size $h$, compute two approximations:
+\begin{itemize}
+    \item $y_{1}$: one step of size $h$;
+    \item $y_{2}$: two steps of size $h/2$.
+\end{itemize}
+The difference
+\begin{equation}
+    E_h=\abs{y_2-y_1}
+    \label{eq:lec06:adaptive-error-estimate}
+\end{equation}
+is used as a practical local error estimate. A natural tolerance for this
+step is
+\begin{equation}
+    \delta_h=\eps\,\frac{h}{b-a}.
+    \label{eq:lec06:local-tolerance}
+\end{equation}
+The basic decision rule is
+\begin{equation}
+    \boxed{
+    E_h<\delta_h
+    \quad\Longrightarrow\quad
+    \text{accept the step}}
+    \label{eq:lec06:accept-rule}
+\end{equation}
+
+\textit{Physical significance:} Eq.~\eqref{eq:lec06:accept-rule} distributes
+the total error budget approximately in proportion to the length of each
+accepted step.
+
+If $E_h>\delta_h$, reject the step, reduce $h$ (for example by a factor of
+$2$), and try again. If $E_h$ is safely below the tolerance, the next step
+can use a larger $h$; if it is close to the tolerance, the next step should
+use a smaller $h$. In vector problems, replace the absolute value in
+Eq.~\eqref{eq:lec06:adaptive-error-estimate} by a chosen norm such as
+$\norm{\mathbf{y}_2-\mathbf{y}_1}$.
+
+\subsubsection{Embedded Runge-Kutta Estimates}
+The one-step-versus-two-half-steps test is reliable but expensive because it
+repeats the whole Runge-Kutta calculation. A more economical method computes
+two different order estimates from mostly the same internal slopes:
+\begin{equation}
+    y_{n+1}^{(p)}
+    =y_n+\sum_{i=1}^{s} b_i k_i,
+    \qquad
+    y_{n+1}^{(p-1)}
+    =y_n+\sum_{i=1}^{s} \tilde b_i k_i.
+    \label{eq:lec06:embedded-rk}
+\end{equation}
+The difference
+\begin{equation}
+    E_h=\abs{y_{n+1}^{(p)}-y_{n+1}^{(p-1)}}
+    \label{eq:lec06:embedded-error}
+\end{equation}
+estimates the local error without recomputing the whole step.
+
+\textit{Physical significance:} embedded Runge-Kutta methods turn the slopes
+already computed for the step into an error bar, which makes adaptive
+integration much cheaper.
+
+\subsubsection{Richardson Extrapolation from One and Two Half-Steps}
+Assume a method has leading local error proportional to $h^3$:
+\begin{align}
+    y_1 &= y_{\mathrm{exact}}+A h^3+B h^4+\cdots,
+    \label{eq:lec06:richardson-one}\\
+    y_2 &= y_{\mathrm{exact}}+2A\left(\frac{h}{2}\right)^3
+          +2B\left(\frac{h}{2}\right)^4+\cdots
+    =y_{\mathrm{exact}}+\frac{A h^3}{4}+\frac{B h^4}{8}+\cdots.
+    \label{eq:lec06:richardson-two}
+\end{align}
+Choose a linear combination that cancels the $A h^3$ term:
+\begin{equation}
+    \boxed{
+    y_{\mathrm{ext}}
+    =\frac{4}{3}y_2-\frac{1}{3}y_1}
+    \label{eq:lec06:richardson-result}
+\end{equation}
+
+\textit{Physical significance:} if the leading error behaves smoothly with
+$h$, Richardson extrapolation uses two imperfect approximations to construct
+a more accurate one.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Stability of Explicit and Implicit Euler Methods}
+\label{subsec:lec06:stability}
+
+\subsubsection*{Physical Motivation}
+Accuracy asks whether the numerical solution is close to the exact solution
+when $h$ is small. Stability asks a different question: do small numerical
+errors decay or grow as the integration proceeds? A method can be formally
+accurate and still unusable if it amplifies errors step after step.
+
+Consider the test equation
+\begin{equation}
+    y'=-c\,y,
+    \qquad c>0,
+    \qquad y(0)=y_0.
+    \label{eq:lec06:decay-equation}
+\end{equation}
+The exact solution is
+\begin{equation}
+    y(x)=y_0 e^{-cx},
+    \label{eq:lec06:decay-exact}
+\end{equation}
+so the physical behavior is monotone decay to zero.
+
+\subsubsection{Explicit Euler Stability}
+Explicit Euler gives
+\begin{equation}
+    y_{n+1}
+    =y_n+h(-c y_n)
+    =(1-ch)y_n.
+    \label{eq:lec06:explicit-euler-decay}
+\end{equation}
+After many steps,
+\begin{equation}
+    y_n=(1-ch)^n y_0.
+    \label{eq:lec06:explicit-euler-many}
+\end{equation}
+For decay rather than growth, the amplification factor must satisfy
+\begin{equation}
+    \abs{1-ch}<1.
+    \label{eq:lec06:explicit-stability-ineq}
+\end{equation}
+Since $c>0$ and $h>0$, this is equivalent to
+\begin{equation}
+    \boxed{
+    h<\frac{2}{c}}
+    \label{eq:lec06:explicit-stability-condition}
+\end{equation}
+
+\textit{Physical significance:} even for the harmless equation
+$y'=-cy$, explicit Euler becomes unstable if the step is too large; the
+computed solution alternates sign and grows instead of decaying.
+
+\subsubsection{Implicit Euler Stability}
+Implicit Euler evaluates the slope at the unknown endpoint:
+\begin{equation}
+    y_{n+1}=y_n+h(-c y_{n+1}).
+    \label{eq:lec06:implicit-euler-start}
+\end{equation}
+Move the endpoint term to the left:
+\begin{equation}
+    (1+ch)y_{n+1}=y_n.
+    \label{eq:lec06:implicit-euler-solve}
+\end{equation}
+Therefore
+\begin{equation}
+    \boxed{
+    y_{n+1}=\frac{y_n}{1+ch}}
+    \label{eq:lec06:implicit-euler-result}
+\end{equation}
+
+\textit{Physical significance:} the amplification factor
+$(1+ch)^{-1}$ is always between $0$ and $1$ for $c,h>0$, so implicit Euler is
+stable for every positive step size on this decay problem.
+
+\subsubsection{Semi-Implicit Linearization}
+For a nonlinear autonomous equation
+\begin{equation}
+    y'=f(y),
+    \label{eq:lec06:autonomous-nonlinear}
+\end{equation}
+the fully implicit Euler step is
+\begin{equation}
+    y_{n+1}=y_n+h\,f(y_{n+1}).
+    \label{eq:lec06:implicit-nonlinear}
+\end{equation}
+Solving Eq.~\eqref{eq:lec06:implicit-nonlinear} exactly may require Newton's
+method at every time step. A cheaper semi-implicit approximation linearizes
+$f$ around $y_n$:
+\begin{equation}
+    f(y_{n+1})
+    \approx f(y_n)+f'(y_n)(y_{n+1}-y_n).
+    \label{eq:lec06:semi-linearization}
+\end{equation}
+Substitute into Eq.~\eqref{eq:lec06:implicit-nonlinear}:
+\begin{equation}
+    y_{n+1}
+    =y_n+h f(y_n)+h f'(y_n)(y_{n+1}-y_n).
+    \label{eq:lec06:semi-start}
+\end{equation}
+Collect terms proportional to $y_{n+1}-y_n$:
+\begin{equation}
+    \left(1-h f'(y_n)\right)(y_{n+1}-y_n)=h f(y_n).
+    \label{eq:lec06:semi-solve}
+\end{equation}
+Thus
+\begin{equation}
+    \boxed{
+    y_{n+1}
+    =y_n+h\,\left(1-h f'(y_n)\right)^{-1}f(y_n)}
+    \label{eq:lec06:semi-result}
+\end{equation}
+
+\textit{Physical significance:} semi-implicit Euler keeps part of the
+stability benefit of an implicit method while avoiding a full nonlinear solve
+at every step.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Systems of ODEs}\label{subsec:lec06:systems}
+
+\subsubsection*{Physical Motivation}
+Most physical ODE problems are systems: a particle has position and velocity,
+a circuit has several dynamical variables, and a discretized field has many
+degrees of freedom. The numerical methods above extend almost unchanged, but
+stability must be checked in all independent modes of the system.
+
+For a vector unknown $\mathbf{y}(x)\in\mathbb{R}^N$, write
+\begin{equation}
+    \frac{d\mathbf{y}}{dx}=\mathbf{f}(x,\mathbf{y}).
+    \label{eq:lec06:vector-ode}
+\end{equation}
+All explicit methods generalize by treating $f$ and $k_i$ as vectors. For
+example, RK4 becomes
+\begin{align}
+    \mathbf{k}_1 &= h\,\mathbf{f}(x_n,\mathbf{y}_n),
+    \label{eq:lec06:vector-rk4-k1}\\
+    \mathbf{k}_2 &= h\,\mathbf{f}\left(x_n+\frac{h}{2},
+        \mathbf{y}_n+\frac{\mathbf{k}_1}{2}\right),
+    \label{eq:lec06:vector-rk4-k2}\\
+    \mathbf{k}_3 &= h\,\mathbf{f}\left(x_n+\frac{h}{2},
+        \mathbf{y}_n+\frac{\mathbf{k}_2}{2}\right),
+    \label{eq:lec06:vector-rk4-k3}\\
+    \mathbf{k}_4 &= h\,\mathbf{f}(x_n+h,\mathbf{y}_n+\mathbf{k}_3),
+    \label{eq:lec06:vector-rk4-k4}
+\end{align}
+and
+\begin{equation}
+    \boxed{
+    \mathbf{y}_{n+1}
+    =\mathbf{y}_n+\frac{1}{6}
+    \left(\mathbf{k}_1+2\mathbf{k}_2+2\mathbf{k}_3+\mathbf{k}_4\right)}
+    \label{eq:lec06:vector-rk4-update}
+\end{equation}
+
+\textit{Physical significance:} once the ODE is written as a first-order
+system, scalar algorithms apply component by component, with vector norms
+used for error control.
+
+\subsubsection{Linear Stability for Systems}
+Consider the linear decay system
+\begin{equation}
+    \mathbf{y}'=-\mathbf{C}\mathbf{y},
+    \label{eq:lec06:linear-system}
+\end{equation}
+where $\mathbf{C}$ is positive definite. Explicit Euler gives
+\begin{equation}
+    \mathbf{y}_{n+1}
+    =\left(\mathbf{I}-h\mathbf{C}\right)\mathbf{y}_n.
+    \label{eq:lec06:explicit-system}
+\end{equation}
+After many steps the repeated amplification matrix is
+\begin{equation}
+    \mathbf{y}_{n}
+    =\left(\mathbf{I}-h\mathbf{C}\right)^n\mathbf{y}_0.
+    \label{eq:lec06:explicit-system-many}
+\end{equation}
+If $\lambda_{\max}$ is the largest eigenvalue of $\mathbf{C}$, stability
+requires
+\begin{equation}
+    \boxed{
+    h<\frac{2}{\lambda_{\max}}}
+    \label{eq:lec06:system-stability-condition}
+\end{equation}
+
+\textit{Physical significance:} the fastest decaying mode of the physical
+system controls the allowed explicit step size; this is why stiff systems are
+difficult for explicit integrators.
+
+Implicit Euler instead gives
+\begin{equation}
+    \left(\mathbf{I}+h\mathbf{C}\right)\mathbf{y}_{n+1}
+    =\mathbf{y}_n,
+    \label{eq:lec06:implicit-system-solve}
+\end{equation}
+or
+\begin{equation}
+    \boxed{
+    \mathbf{y}_{n+1}
+    =\left(\mathbf{I}+h\mathbf{C}\right)^{-1}\mathbf{y}_n}
+    \label{eq:lec06:implicit-system-result}
+\end{equation}
+
+\textit{Physical significance:} the eigenvalues of
+$(\mathbf{I}+h\mathbf{C})^{-1}$ are $(1+h\lambda_i)^{-1}$, which lie between
+$0$ and $1$ for $h>0$ and $\lambda_i>0$; the implicit system is therefore
+stable for all positive step sizes.
+
+For nonlinear systems, the semi-implicit scalar formula becomes a matrix
+formula using the Jacobian
+\begin{equation}
+    \Jac(\mathbf{y})=
+    \frac{\partial \mathbf{f}}{\partial \mathbf{y}}.
+    \label{eq:lec06:jacobian-definition}
+\end{equation}
+The update is
+\begin{equation}
+    \boxed{
+    \mathbf{y}_{n+1}
+    =\mathbf{y}_n+h
+    \left(\mathbf{I}-h\Jac(\mathbf{y}_n)\right)^{-1}
+    \mathbf{f}(\mathbf{y}_n)}
+    \label{eq:lec06:semi-implicit-system}
+\end{equation}
+
+\textit{Physical significance:} in multiple dimensions, semi-implicit
+integration replaces division by a scalar with solving a linear system; this
+is more expensive than an explicit step but can be essential for stability.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+    \item \textit{Computational Physics}, Mark Newman --- Ch.\ 8.1--8.4
+    (Euler, Runge-Kutta, adaptive step sizes, and higher-order ODE methods).
+    \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 17.1--17.2
+    (Runge-Kutta methods, adaptive steps, and embedded error estimates).
+    \item Tao Pang, \textit{An Introduction to Computational Physics} ---
+    Ch.\ 3.2--3.4 (ODE solvers and stability).
+    \item MIT OpenCourseWare, \href{https://ocw.mit.edu/courses/18-03sc-differential-equations-fall-2011/pages/unit-iii-fourier-series-and-laplace-transform/numerical-methods/}{Numerical Methods for ODEs}
+    --- useful short review of Euler and Runge-Kutta ideas.
+\end{itemize}
