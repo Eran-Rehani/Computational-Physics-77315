@@ -1,0 +1,656 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 07 — Stiff ODEs, Numerov Method, Boundary-Value Problems,
+%%              and Relaxation
+%% 77315 — Computational Physics
+%% Date: 07/05/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 07 — Stiff ODEs, Numerov Method, Boundary-Value
+  Problems, and Relaxation}\label{sec:lec07}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 07/05/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+Lecture~\ref{sec:lec06} ended with the stability restriction for explicit
+methods applied to systems of ODEs. This lecture begins by turning that
+criterion into a concrete example of a \emph{stiff} system: a system whose
+fast-decaying modes force a tiny numerical step even though the physically
+interesting solution evolves slowly. The lecture then introduces Numerov's
+method for second-order equations of the form
+$y''(x)=f(x)y(x)+g(x)$, and moves from initial-value problems to
+boundary-value problems. The final part explains shooting, shooting to a
+fitting point, and relaxation, with a white-dwarf structure problem as the
+main physical example.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{A Stiff Two-Variable System}\label{subsec:lec07:stiff-example}
+
+\subsubsection*{Physical Motivation}
+In many physical systems several processes act on the same variables but on
+very different time scales. A chemical abundance may have a very fast
+transient and a slow secular evolution; a mechanical system may contain a
+heavily damped mode and a slowly damped mode. Numerically, the fast mode may
+control stability even after it has become physically negligible.
+
+Consider the linear system
+\begin{align}
+    u' &= 998u+1998v,
+    \label{eq:lec07:stiff-u}\\
+    v' &= -999u-1999v,
+    \label{eq:lec07:stiff-v}
+\end{align}
+with initial data
+\begin{equation}
+    u(0)=1,
+    \qquad
+    v(0)=0.
+    \label{eq:lec07:stiff-initial-data}
+\end{equation}
+Introduce new variables $y$ and $z$ by
+\begin{equation}
+    u=2y-z,
+    \qquad
+    v=-y+z.
+    \label{eq:lec07:stiff-change-variables}
+\end{equation}
+Adding the two original equations gives
+\begin{equation}
+    y'=u'+v'=-u-v.
+    \label{eq:lec07:y-prime-start}
+\end{equation}
+Since $u+v=y$, this becomes
+\begin{equation}
+    \boxed{y'=-y}
+    \label{eq:lec07:y-prime}
+\end{equation}
+
+\textit{Physical significance:} $y$ is the slow mode; it decays on the
+order-one scale in $x$.
+
+To isolate $z$, use $u+2v=z$. Therefore
+\begin{equation}
+    z'=u'+2v'.
+    \label{eq:lec07:z-prime-start}
+\end{equation}
+Substituting Eqs.~\eqref{eq:lec07:stiff-u}--\eqref{eq:lec07:stiff-v}
+and then Eq.~\eqref{eq:lec07:stiff-change-variables} gives
+\begin{align}
+    z'
+    &= (998u+1998v)+2(-999u-1999v)
+    \label{eq:lec07:z-prime-algebra-one}\\
+    &= -1000u-2000v
+    = -1000(u+2v)
+    = -1000z.
+    \label{eq:lec07:z-prime-algebra-two}
+\end{align}
+Thus
+\begin{equation}
+    \boxed{z'=-1000z}
+    \label{eq:lec07:z-prime}
+\end{equation}
+
+\textit{Physical significance:} $z$ is the fast transient; it decays on the
+scale $10^{-3}$ in $x$.
+
+The initial data imply
+\begin{equation}
+    y(0)=u(0)+v(0)=1,
+    \qquad
+    z(0)=u(0)+2v(0)=1.
+    \label{eq:lec07:yz-initial-data}
+\end{equation}
+Therefore
+\begin{equation}
+    y(x)=e^{-x},
+    \qquad
+    z(x)=e^{-1000x}.
+    \label{eq:lec07:yz-solutions}
+\end{equation}
+Returning to $u$ and $v$,
+\begin{align}
+    \boxed{u(x)=2e^{-x}-e^{-1000x}},
+    \label{eq:lec07:u-solution}\\
+    \boxed{v(x)=-e^{-x}+e^{-1000x}}.
+    \label{eq:lec07:v-solution}
+\end{align}
+
+\textit{Physical significance:} after a very short initial layer, the
+solution is dominated by $e^{-x}$, but an explicit integrator still has to
+respect the stability constraint imposed by the $e^{-1000x}$ mode.
+
+For an explicit method such as Euler, Lecture~\ref{sec:lec06} showed that a
+decay mode $e^{-\lambda x}$ imposes roughly
+\begin{equation}
+    h<\frac{2}{\lambda}.
+    \label{eq:lec07:euler-mode-stability}
+\end{equation}
+Here the largest decay rate is $\lambda=1000$, so
+\begin{equation}
+    \boxed{h<2\times 10^{-3}}
+    \label{eq:lec07:stiff-step-restriction}
+\end{equation}
+
+\textit{Physical significance:} the numerical method must take thousands of
+tiny steps per unit interval even though the surviving physical mode varies
+on a scale of order $1$. This mismatch is the hallmark of stiffness.
+
+Implicit or semi-implicit methods are designed precisely for this situation:
+they damp the fast stable modes without forcing the step size to resolve
+their decay in detail.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Numerov's Method for Second-Order Equations}
+\label{subsec:lec07:numerov}
+
+\subsubsection*{Physical Motivation}
+Many physics problems reduce directly to a second-order equation rather than
+to an arbitrary first-order system. If the equation is linear in $y$, then
+we can exploit the special structure to obtain a very accurate three-point
+method with little extra work. This is the purpose of Numerov's method.
+
+Consider
+\begin{equation}
+    y''(x)=f(x)y(x)+g(x),
+    \label{eq:lec07:numerov-equation}
+\end{equation}
+where $f$ and $g$ are known functions. Two common physical examples are:
+\begin{align}
+    \psi''(x) &= -k^2(x)\psi(x),
+    \label{eq:lec07:wave-example}\\
+    \frac{1}{r^2}\frac{d}{dr}
+    \left(r^2\frac{d\phi}{dr}\right)
+    &= -4\pi\rho(r).
+    \label{eq:lec07:poisson-radial}
+\end{align}
+In the radial Poisson problem, defining $u(r)=r\phi(r)$ converts the radial
+operator to a second derivative:
+\begin{equation}
+    u''(r)=-4\pi r\rho(r).
+    \label{eq:lec07:poisson-u}
+\end{equation}
+This is a special case of Eq.~\eqref{eq:lec07:numerov-equation}.
+
+\subsubsection*{Physical Motivation}
+The central finite-difference formula for $y''$ is second order. Numerov's
+method improves it by using the differential equation itself to cancel the
+leading fourth-derivative error. The result is a symmetric stencil involving
+$x-h$, $x$, and $x+h$.
+
+Expand $y(x+h)$ and $y(x-h)$ around $x$:
+\begin{align}
+    y(x+h)
+    &=y+h y'+\frac{h^2}{2}y''
+      +\frac{h^3}{6}y'''
+      +\frac{h^4}{24}y^{(4)}
+      +\frac{h^5}{120}y^{(5)}
+      +\bigO{h^6},
+    \label{eq:lec07:taylor-plus}\\
+    y(x-h)
+    &=y-h y'+\frac{h^2}{2}y''
+      -\frac{h^3}{6}y'''
+      +\frac{h^4}{24}y^{(4)}
+      -\frac{h^5}{120}y^{(5)}
+      +\bigO{h^6}.
+    \label{eq:lec07:taylor-minus}
+\end{align}
+Adding them cancels the odd derivatives:
+\begin{equation}
+    y(x+h)+y(x-h)
+    =2y+h^2y''+\frac{h^4}{12}y^{(4)}+\bigO{h^6}.
+    \label{eq:lec07:taylor-sum}
+\end{equation}
+Now apply the same central sum to $y''$:
+\begin{equation}
+    y''(x+h)+y''(x-h)
+    =2y''+h^2y^{(4)}+\bigO{h^4}.
+    \label{eq:lec07:second-derivative-sum}
+\end{equation}
+Multiplying Eq.~\eqref{eq:lec07:second-derivative-sum} by $h^2/12$ and
+subtracting it from Eq.~\eqref{eq:lec07:taylor-sum} eliminates
+$y^{(4)}$:
+\begin{equation}
+    y(x+h)+y(x-h)
+    -\frac{h^2}{12}\left[y''(x+h)+y''(x-h)\right]
+    =2y+\frac{5h^2}{6}y''+\bigO{h^6}.
+    \label{eq:lec07:numerov-before-substitution}
+\end{equation}
+Let
+\begin{equation}
+    x_i=x_0+ih,
+    \qquad
+    y_i=y(x_i),
+    \qquad
+    f_i=f(x_i),
+    \qquad
+    g_i=g(x_i).
+    \label{eq:lec07:grid-definitions}
+\end{equation}
+Substitute $y_i''=f_i y_i+g_i$ into
+Eq.~\eqref{eq:lec07:numerov-before-substitution}. After collecting the
+terms with $y_{i+1}$, $y_i$, and $y_{i-1}$, one obtains
+\begin{equation}
+    \boxed{
+    \left(1-\frac{h^2}{12}f_{i+1}\right)y_{i+1}
+    -2\left(1+\frac{5h^2}{12}f_i\right)y_i
+    +\left(1-\frac{h^2}{12}f_{i-1}\right)y_{i-1}
+    =
+    \frac{h^2}{12}
+    \left(g_{i+1}+10g_i+g_{i-1}\right)}
+    \label{eq:lec07:numerov-formula}
+\end{equation}
+with local error $\bigO{h^6}$.
+
+\textit{Physical significance:} Numerov's method advances a linear
+second-order equation with high accuracy while requiring only one new
+evaluation of the known coefficients at the next grid point.
+
+Because Eq.~\eqref{eq:lec07:numerov-formula} is symmetric, it naturally uses
+equally spaced points. The step size can still be changed in factors of two:
+to halve $h$, compute an intermediate point and continue on the finer grid;
+to double $h$, skip every other point in the next stencil. Like all
+multi-point methods, Numerov also needs a startup procedure, because the
+values at two neighboring points must be known before the recurrence can
+begin.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Boundary-Value Problems and Shooting}
+\label{subsec:lec07:boundary-value}
+
+\subsubsection*{Physical Motivation}
+An initial-value problem gives all needed data at one endpoint and asks us
+to march forward. Many physical problems instead specify conditions at two
+different places: a wavefunction must be regular at the origin and decay at
+infinity, a string may be fixed at both ends, and a stellar model must be
+regular at the center and have vanishing pressure at the surface. These are
+boundary-value problems.
+
+For a second-order equation written as a first-order system,
+\begin{align}
+    \frac{dy}{dx} &= F(x,y,z),
+    \label{eq:lec07:bvp-system-y}\\
+    \frac{dz}{dx} &= G(x,y,z),
+    \label{eq:lec07:bvp-system-z}
+\end{align}
+an initial-value problem might specify both $y(x_1)$ and $z(x_1)$. A
+boundary-value problem may instead specify
+\begin{equation}
+    y(x_1)=a,
+    \qquad
+    y(x_2)=b,
+    \label{eq:lec07:bvp-simple-boundaries}
+\end{equation}
+leaving the initial derivative-like variable $z(x_1)$ unknown.
+
+The shooting method treats the missing initial datum as a parameter. Choose
+a trial value
+\begin{equation}
+    z(x_1)=s,
+    \label{eq:lec07:shooting-trial-slope}
+\end{equation}
+integrate the initial-value problem to $x_2$, and define the mismatch
+\begin{equation}
+    \Delta(s)=y(x_2;s)-b.
+    \label{eq:lec07:shooting-mismatch}
+\end{equation}
+The correct initial slope satisfies
+\begin{equation}
+    \boxed{\Delta(s)=0}
+    \label{eq:lec07:shooting-root}
+\end{equation}
+
+\textit{Physical significance:} shooting converts a boundary-value problem
+into a root-finding problem for the unknown initial data.
+
+For an $N$-dimensional first-order system
+\begin{equation}
+    \frac{dy_i}{dx}
+    =f_i(x,y_1,\ldots,y_N),
+    \qquad i=1,\ldots,N,
+    \label{eq:lec07:general-first-order-system}
+\end{equation}
+suppose $N_1$ boundary conditions are imposed at $x_1$ and $N_2$ are imposed
+at $x_2$, with
+\begin{equation}
+    N=N_1+N_2.
+    \label{eq:lec07:condition-count}
+\end{equation}
+The boundary conditions need not be simple values. They may be relations
+\begin{align}
+    B_j^{(1)}(x_1,y_1,\ldots,y_N)&=0,
+    \qquad j=1,\ldots,N_1,
+    \label{eq:lec07:left-boundary-relations}\\
+    B_j^{(2)}(x_2,y_1,\ldots,y_N)&=0,
+    \qquad j=1,\ldots,N_2.
+    \label{eq:lec07:right-boundary-relations}
+\end{align}
+Shooting guesses the $N_2$ missing degrees of freedom at $x_1$, integrates
+to $x_2$, and solves the $N_2$ mismatch equations there.
+
+\textit{Physical significance:} the number of guessed initial quantities
+must match the number of missing right-boundary constraints; otherwise the
+boundary-value problem is either underdetermined or overdetermined.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Shooting to a Fitting Point}\label{subsec:lec07:fitting-point}
+
+\subsubsection*{Physical Motivation}
+Sometimes integration from the left endpoint all the way to the right is
+numerically unstable or impossible because of singular behavior. In such
+cases it is better to integrate from both ends toward a common point and
+demand that the two partial solutions meet there.
+
+Let $x_m$ be an interior fitting point. Integrate from $x_1$ to $x_m$ using
+unknown parameters $\mathbf{s}_L$, and integrate from $x_2$ back to $x_m$
+using unknown parameters $\mathbf{s}_R$. The matching condition is
+\begin{equation}
+    \boxed{
+    \mathbf{y}_L(x_m;\mathbf{s}_L)
+    -\mathbf{y}_R(x_m;\mathbf{s}_R)=\mathbf{0}}
+    \label{eq:lec07:fitting-condition}
+\end{equation}
+
+\textit{Physical significance:} shooting to a fitting point avoids forcing a
+single integration through a region where the numerical solution would
+become badly conditioned.
+
+This method is especially useful when each boundary selects a locally stable
+branch of the solution. Each side is integrated in the direction in which it
+behaves well, and the root-finding problem adjusts the free parameters until
+the two branches join smoothly.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{White-Dwarf Structure as a Boundary-Value Problem}
+\label{subsec:lec07:white-dwarf}
+
+\subsubsection*{Physical Motivation}
+A white dwarf is supported by degeneracy pressure. In the simplified model
+used here, the pressure depends only on density and not on temperature. The
+star is therefore a clean example of a boundary-value problem: gravity pulls
+inward, the pressure gradient pushes outward, the center must be regular,
+and the pressure must vanish at the surface.
+
+Use the enclosed mass $m$ as the independent variable. Hydrostatic
+equilibrium may be written as
+\begin{equation}
+    \frac{dP}{dm}
+    =-\frac{Gm}{4\pi r^4},
+    \label{eq:lec07:hydrostatic-mass}
+\end{equation}
+where $P$ is pressure, $G$ is Newton's constant, and $r(m)$ is the radius
+enclosing mass $m$. The equation of state is approximated by a polytrope,
+\begin{equation}
+    \boxed{P=K\rho^\gamma}
+    \label{eq:lec07:polytropic-eos}
+\end{equation}
+
+\textit{Physical significance:} the exponent $\gamma$ measures how strongly
+the pressure rises when the star is compressed.
+
+For nonrelativistic degenerate matter,
+\begin{equation}
+    \gamma=\frac{5}{3},
+    \label{eq:lec07:gamma-nonrel}
+\end{equation}
+while in the relativistic limit,
+\begin{equation}
+    \gamma=\frac{4}{3}.
+    \label{eq:lec07:gamma-rel}
+\end{equation}
+The lecture used an order-of-magnitude estimate to understand the
+mass-radius relation. Approximate the central pressure scale by
+$P/M$ in Eq.~\eqref{eq:lec07:hydrostatic-mass}, and estimate the density by
+\begin{equation}
+    \rho\sim \frac{M}{\frac{4\pi}{3}R^3},
+    \label{eq:lec07:mean-density}
+\end{equation}
+where $M$ and $R$ are the total mass and outer radius. Then
+\begin{equation}
+    \frac{K\rho^\gamma}{M}
+    \sim \frac{GM}{4\pi R^4}.
+    \label{eq:lec07:scaling-balance-start}
+\end{equation}
+Substituting Eq.~\eqref{eq:lec07:mean-density} gives the scaling relation
+\begin{equation}
+    K\left(\frac{M}{R^3}\right)^\gamma
+    \sim \frac{GM^2}{R^4}.
+    \label{eq:lec07:scaling-balance}
+\end{equation}
+Rearranging,
+\begin{equation}
+    R^{4-3\gamma}\sim
+    \frac{G}{K}M^{2-\gamma}.
+    \label{eq:lec07:mass-radius-general}
+\end{equation}
+For $\gamma=5/3$,
+\begin{equation}
+    \boxed{R\propto M^{-1/3}}
+    \label{eq:lec07:mass-radius-nonrel}
+\end{equation}
+
+\textit{Physical significance:} a more massive nonrelativistic white dwarf
+is smaller, because stronger gravity requires a higher density and therefore
+a smaller radius.
+
+For $\gamma=4/3$, the radius drops out of the scaling relation:
+\begin{equation}
+    M^{2-\gamma}=M^{2/3}\sim \text{constant}.
+    \label{eq:lec07:mass-limit-scaling}
+\end{equation}
+Thus the model predicts a special mass scale rather than a free
+mass-radius curve:
+\begin{equation}
+    \boxed{M\sim M_{\mathrm{Ch}}}
+    \label{eq:lec07:chandrasekhar-scale}
+\end{equation}
+
+\textit{Physical significance:} in the relativistic degenerate limit,
+increasing density no longer raises pressure fast enough to balance gravity
+for arbitrary mass. This is the origin of the Chandrasekhar-limit behavior.
+
+The estimate is only qualitative, because it replaces a differential
+equation by a global scaling argument. The actual numerical task is to solve
+the discretized hydrostatic equilibrium equations.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Relaxation Discretization for the White Dwarf}
+\label{subsec:lec07:relaxation}
+
+\subsubsection*{Physical Motivation}
+Shooting changes a few initial parameters and repeatedly integrates across
+the domain. Relaxation takes a more global view: guess the entire solution
+on a grid and then adjust all grid values until every discrete equation and
+boundary condition is satisfied at once.
+
+Divide the star into $N$ mass shells. Let
+\begin{equation}
+    m_i=\frac{i}{N}M,
+    \qquad i=1,\ldots,N,
+    \label{eq:lec07:mass-grid}
+\end{equation}
+and use the shell radii $r_i$ as the unknowns. The center condition is
+\begin{equation}
+    r_0=0,
+    \qquad
+    m_0=0.
+    \label{eq:lec07:center-conditions}
+\end{equation}
+The pressure in shell $i$ is
+\begin{equation}
+    P_i=K\rho_i^\gamma,
+    \label{eq:lec07:shell-pressure}
+\end{equation}
+where the shell density is mass divided by shell volume:
+\begin{equation}
+    \rho_i=
+    \frac{m_i-m_{i-1}}
+    {\frac{4\pi}{3}\left(r_i^3-r_{i-1}^3\right)}.
+    \label{eq:lec07:shell-density}
+\end{equation}
+The finite-difference pressure gradient around shell interface $i$ is
+\begin{equation}
+    \frac{\Delta P_i}{\Delta m_i}
+    =
+    \frac{P_{i+1}-P_i}
+    {\frac{1}{2}(m_{i+1}+m_i)-\frac{1}{2}(m_i+m_{i-1})}.
+    \label{eq:lec07:pressure-gradient-discrete}
+\end{equation}
+For the uniform mass grid this denominator is simply $M/N$.
+
+Define the residual
+\begin{equation}
+    F_i(\mathbf{r})
+    =
+    \frac{\Delta P_i}{\Delta m_i}
+    \left(\frac{4\pi r_i^4}{Gm_i}\right)
+    +1,
+    \qquad i=1,\ldots,N.
+    \label{eq:lec07:relaxation-residual}
+\end{equation}
+The discrete hydrostatic equilibrium problem is
+\begin{equation}
+    \boxed{
+    F_i(\mathbf{r})=0,
+    \qquad i=1,\ldots,N}
+    \label{eq:lec07:relaxation-system}
+\end{equation}
+
+\textit{Physical significance:} each residual measures how far one mass
+shell is from balancing the pressure gradient against gravity.
+
+At the outer boundary the pressure outside the star is zero. This is encoded
+by
+\begin{equation}
+    P_{N+1}=0,
+    \qquad
+    m_{N+1}=m_N=M.
+    \label{eq:lec07:surface-conditions}
+\end{equation}
+Together with the center conditions, the $N$ equations determine the
+$N$ unknown radii $r_1,\ldots,r_N$.
+
+Newton's method for the vector residual is
+\begin{equation}
+    \sum_{j=1}^{N}
+    \frac{\partial F_i}{\partial r_j}\Delta r_j
+    =-F_i(\mathbf{r}),
+    \qquad i=1,\ldots,N.
+    \label{eq:lec07:newton-linear-system}
+\end{equation}
+After solving this linear system, update
+\begin{equation}
+    r_i^{\mathrm{new}}=r_i+\Delta r_i.
+    \label{eq:lec07:newton-radius-update}
+\end{equation}
+The derivatives $\partial F_i/\partial r_j$ should be evaluated
+analytically, because the residuals depend only on neighboring shell radii
+and the resulting Jacobian is structured.
+
+\textit{Physical significance:} relaxation solves for the whole stellar
+profile at once; the price is that each iteration requires a linear solve
+with the Jacobian matrix.
+
+The initial guess requested in the lecture is a linear radius profile,
+\begin{equation}
+    r_i^{(0)}=\frac{i}{N}R_{\mathrm{guess}},
+    \label{eq:lec07:linear-radius-guess}
+\end{equation}
+with $N=100$ for the main calculations. Because the first guess can be far
+from the solution, the Newton correction must be damped if it would make the
+radius grid nonmonotonic. Use
+\begin{equation}
+    r_i^{\mathrm{new}}=r_i+\alpha\Delta r_i,
+    \qquad
+    0<\alpha\leq 1,
+    \label{eq:lec07:damped-newton-update}
+\end{equation}
+and choose $\alpha$ small enough that
+\begin{equation}
+    r_{i+1}^{\mathrm{new}}>r_i^{\mathrm{new}}
+    \qquad
+    \text{for all } i.
+    \label{eq:lec07:monotone-radius-condition}
+\end{equation}
+
+\textit{Physical significance:} shell crossing would imply negative or
+infinite densities, so damping the Newton step preserves the physical
+ordering of the mass shells.
+
+The lecture also emphasizes a practical lesson: a black-box nonlinear solver
+from a library may fail when the initial guess is too far from the physical
+solution. A custom relaxation algorithm can include problem-specific damping
+and monotonicity checks, which makes it more robust for this stellar
+structure problem.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Computational Tasks from the Lecture}
+\label{subsec:lec07:computational-tasks}
+
+\subsubsection*{Physical Motivation}
+The homework tasks are designed to connect the numerical algorithms to a
+real physical model. The point is not only to obtain numbers, but also to
+test whether the numerical method reproduces the expected scaling laws and
+where the simplified physics begins to fail.
+
+The requested solver should:
+\begin{enumerate}
+    \item implement a general Newton solver for $N$ equations in $N$
+    unknowns, using both a residual function $\mathbf{F}(\mathbf{x})$ and an
+    analytic Jacobian $\partial F_i/\partial x_j$;
+    \item test this solver on a problem with a known analytic solution;
+    \item implement the white-dwarf residuals
+    Eq.~\eqref{eq:lec07:relaxation-residual} and their analytic Jacobian;
+    \item solve the nonrelativistic case $\gamma=5/3$ for
+    $M=1M_\odot$, $R_{\mathrm{guess}}=1R_\odot$, and $N=100$;
+    \item plot and tabulate $\rho(r)$ in CGS units;
+    \item solve several masses and check whether $RM^{1/3}$ is
+    approximately constant;
+    \item solve the nearly relativistic case $\gamma=1.334$ for masses near
+    $1.4M_\odot$ and inspect how the outer radius changes;
+    \item compare with a SciPy nonlinear solver, noting that it may require
+    an initial radius guess closer to the final solution.
+\end{enumerate}
+
+The central diagnostic for the nonrelativistic sequence is
+\begin{equation}
+    \boxed{
+    RM^{1/3}\approx \text{constant}}
+    \label{eq:lec07:nonrel-diagnostic}
+\end{equation}
+
+\textit{Physical significance:} this numerical check tests whether the full
+discrete hydrostatic model reproduces the scaling argument
+$R\propto M^{-1/3}$.
+
+For the nearly relativistic sequence, small changes in mass can produce
+large changes in radius:
+\begin{equation}
+    \gamma=1.334,
+    \qquad
+    M/M_\odot=1.40,1.41,\ldots,1.46.
+    \label{eq:lec07:near-relativistic-sequence}
+\end{equation}
+
+\textit{Physical significance:} the sensitivity near $\gamma=4/3$ reflects
+the approach to the limiting-mass behavior discussed in
+Eq.~\eqref{eq:lec07:chandrasekhar-scale}.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+    \item \textit{Computational Physics}, Mark Newman --- Ch.\ 8.6--8.8
+    (boundary-value problems and relaxation ideas).
+    \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 17.4 and
+    Ch.\ 18.1--18.2 (stiff equations, shooting, relaxation, and boundary
+    value problems).
+    \item Tao Pang, \textit{An Introduction to Computational Physics} ---
+    Ch.\ 3.5--3.6 (Numerov's method and boundary-value problems).
+    \item S. Chandrasekhar, \textit{An Introduction to the Study of Stellar
+    Structure} --- classic background on polytropes and white-dwarf
+    mass-radius relations.
+\end{itemize}
