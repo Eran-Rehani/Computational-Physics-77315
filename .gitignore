@@ -11,7 +11,7 @@ __pycache__/
 .DS_Store
 test_venv/
 .ipynb_checkpoints/
-*.ipynb
+.ipynb_checkpoints/
 transcripts/
 summary/
 Literature/
