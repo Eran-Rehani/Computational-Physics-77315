@@ -11,8 +11,6 @@
 \usepackage{fancyhdr}
 \usepackage{subfiles}
 \usepackage{siunitx}
-\usepackage[most]{tcolorbox}
-
 %% ── Page style ───────────────────────────────────────────────────────────────
 \pagestyle{fancy}
 \fancyhf{}
@@ -20,12 +18,8 @@
 \rhead{\small \thesubsection}
 \cfoot{\thepage}
 
-%% ── Theorem environments ─────────────────────────────────────────────────────
-\newtheorem{theorem}{Theorem}
-\newtheorem{lemma}[theorem]{Lemma}
-\theoremstyle{definition}
-\newtheorem{definition}{Definition}
-\newtheorem{example}{Example}
+%% ── Theorem environments (eye-candy tcolorbox) ───────────────────────────────
+\usepackage{eye-candy}
 \theoremstyle{remark}
 \newtheorem{remark}{Remark}
 
