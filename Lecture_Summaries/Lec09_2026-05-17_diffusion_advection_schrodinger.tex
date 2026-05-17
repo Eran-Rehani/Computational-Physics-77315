@@ -1,0 +1,402 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 09 — Time-Dependent PDEs: Diffusion, Schrödinger,
+%%              and Advection
+%% 77315 — Computational Physics
+%% Date: 17/05/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 09 — Time-Dependent PDEs: Diffusion, Schr\"{o}dinger
+  Equation, and Advection}\label{sec:lec09}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 17/05/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+Having classified PDEs and studied the elliptic (stationary) Poisson
+equation in Lecture~\ref{sec:lec08}, we now turn to time-dependent
+problems. The diffusion equation is parabolic and requires a time
+integration scheme; we derive the explicit FTCS scheme, prove its
+stability condition by von Neumann analysis, introduce the unconditionally
+stable fully-implicit (BTCS) scheme, and derive the
+\emph{Crank--Nicholson} method that is second-order in both space and
+time. We then extend to two spatial dimensions via the
+Alternating-Direction Implicit (ADI) method.  As a quantum-mechanical
+application, we apply the same ideas to the time-dependent Schrödinger
+equation and derive the norm-conserving \emph{Cayley form}.  The
+lecture closes with the hyperbolic advection equation and the
+Lax scheme together with the Courant–Friedrichs–Lewy (CFL) stability
+condition.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{The 1D Diffusion Equation and FTCS}\label{subsec:lec09:ftcs}
+
+\subsubsection*{Physical Motivation}
+Heat conduction in a rod, diffusion of a chemical species, or random
+walks on a lattice all lead to the diffusion equation.  We want to
+compute how an initial concentration profile $u(x,0)$ spreads in time.
+
+The 1D diffusion equation with constant diffusivity $D$ is
+\begin{equation}
+  \frac{\partial u}{\partial t}
+  = D\frac{\partial^2 u}{\partial x^2}.
+  \label{eq:lec09:diffusion}
+\end{equation}
+Discretise with time step $\Delta t$ and space step $\Delta x$.
+Use the \emph{Forward Time, Centered Space} (FTCS) scheme: the time
+derivative is a forward difference at level $n$, and the spatial
+second derivative is the symmetric difference at the same level:
+\begin{equation}
+  \boxed{
+  \frac{u_j^{n+1}-u_j^{n}}{\Delta t}
+  = D\frac{u_{j+1}^{n}-2u_j^{n}+u_{j-1}^{n}}{(\Delta x)^2}}
+  \label{eq:lec09:ftcs}
+\end{equation}
+Rearranging gives an explicit update:
+\begin{equation}
+  u_j^{n+1}
+  = u_j^{n}
+  + \alpha\!\left(u_{j+1}^{n}-2u_j^{n}+u_{j-1}^{n}\right),
+  \qquad
+  \alpha \equiv \frac{D\Delta t}{(\Delta x)^2}.
+  \label{eq:lec09:ftcs-explicit}
+\end{equation}
+
+\textit{Physical significance:} $\alpha$ is the ratio of the diffusion
+time across one spatial cell to the time step.  When $\alpha$ is too
+large, the scheme over-corrects local gradients and becomes unstable.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Von Neumann Stability Analysis}\label{subsec:lec09:vn}
+
+\subsubsection*{Physical Motivation}
+We need a systematic criterion for choosing $\Delta t$ given $\Delta x$.
+Von Neumann analysis decomposes the numerical error into Fourier modes
+and asks whether each mode grows or decays.
+
+Substitute the ansatz $u_j^n = \xi^n e^{ikj\Delta x}$ into
+Eq.~\eqref{eq:lec09:ftcs}.  Here $\xi(k)$ is the \emph{amplification
+factor} for wavenumber $k$. For the FTCS scheme one obtains:
+\begin{align}
+  \xi^n e^{ikj\Delta x}(\xi-1)
+  &= \alpha\,\xi^n e^{ikj\Delta x}
+     \!\left(e^{ik\Delta x}-2+e^{-ik\Delta x}\right) \notag\\
+  &= \alpha\,\xi^n e^{ikj\Delta x}
+     \!\left(e^{i(k\Delta x)/2}-e^{-i(k\Delta x)/2}\right)^2,
+  \label{eq:lec09:vn-algebra}
+\end{align}
+giving
+\begin{equation}
+  \boxed{\xi(k) = 1 - 4\alpha\sin^2\!\!\left(\frac{k\Delta x}{2}\right)}
+  \label{eq:lec09:ftcs-amplification}
+\end{equation}
+The scheme is stable when $\abs{\xi(k)}\leq 1$ for all $k$.  The most
+dangerous mode is $k=\pi/\Delta x$ (shortest wavelength), where
+$\xi = 1-4\alpha$.  Requiring $\xi\geq -1$ gives:
+\begin{equation}
+  \boxed{\alpha \leq \tfrac{1}{2},
+  \qquad\text{i.e.}\quad
+  \Delta t \leq \frac{(\Delta x)^2}{2D}}
+  \label{eq:lec09:ftcs-stability}
+\end{equation}
+
+\textit{Physical significance:} the allowed time step shrinks as the
+square of the grid spacing.  Halving $\Delta x$ forces a fourfold
+reduction in $\Delta t$ and an eightfold increase in computational
+work — explicit methods are expensive for the diffusion equation on
+fine grids.  The characteristic diffusion time across a cell is
+$\tau = (\Delta x)^2/D$; the stability condition says we must take
+many time steps per diffusion time.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Fully Implicit (BTCS) Scheme}\label{subsec:lec09:btcs}
+
+\subsubsection*{Physical Motivation}
+To remove the stability restriction one evaluates the spatial
+derivatives at the \emph{new} time level $n+1$ rather than at the
+current level $n$.
+
+The \emph{Backward Time, Centered Space} (BTCS) scheme is
+\begin{equation}
+  \boxed{
+  \frac{u_j^{n+1}-u_j^{n}}{\Delta t}
+  = D\frac{u_{j+1}^{n+1}-2u_j^{n+1}+u_{j-1}^{n+1}}{(\Delta x)^2}}
+  \label{eq:lec09:btcs}
+\end{equation}
+Rearranging, with $\alpha=D\Delta t/(\Delta x)^2$:
+\begin{equation}
+  -\alpha u_{j-1}^{n+1}+(1+2\alpha)u_j^{n+1}-\alpha u_{j+1}^{n+1}
+  = u_j^{n},
+  \qquad j=1,2,\ldots,N-1.
+  \label{eq:lec09:btcs-system}
+\end{equation}
+This is a tridiagonal system for the unknowns $\{u_j^{n+1}\}$, solvable
+in $\bigO{N}$ operations.
+
+Von Neumann analysis gives the amplification factor
+\begin{equation}
+  \xi = \frac{1}{1+4\alpha\sin^2(k\Delta x/2)},
+  \label{eq:lec09:btcs-amplification}
+\end{equation}
+so $\abs{\xi}<1$ for all $k$ and all $\alpha>0$:
+\begin{equation}
+  \boxed{\text{BTCS is unconditionally stable.}}
+  \label{eq:lec09:btcs-stable}
+\end{equation}
+
+\textit{Physical significance:} one may take arbitrarily large time
+steps without numerical instability.  However, the accuracy in time is
+only first order, so large $\Delta t$ produces inaccurate results even
+if the scheme is stable — stability is necessary but not sufficient for
+a good numerical solution.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Crank--Nicholson Scheme}\label{subsec:lec09:cn}
+
+\subsubsection*{Physical Motivation}
+The FTCS scheme is first-order in time and conditionally stable.
+The BTCS scheme is first-order in time and unconditionally stable.
+Averaging them yields a scheme that is second-order in time \emph{and}
+unconditionally stable.
+
+The \emph{Crank--Nicholson} scheme evaluates the spatial diffusion
+term as the mean of the $n$th and $(n+1)$th levels:
+\begin{equation}
+  \boxed{
+  \frac{u_j^{n+1}-u_j^{n}}{\Delta t}
+  = \frac{D}{2(\Delta x)^2}
+    \!\left[
+      \left(u_{j+1}^{n+1}-2u_j^{n+1}+u_{j-1}^{n+1}\right)
+      +\left(u_{j+1}^{n}-2u_j^{n}+u_{j-1}^{n}\right)
+    \right]}
+  \label{eq:lec09:cn}
+\end{equation}
+This is again a tridiagonal system.  Von Neumann analysis gives
+\begin{equation}
+  \boxed{
+  \xi = \frac{1-2\alpha\sin^2(k\Delta x/2)}
+             {1+2\alpha\sin^2(k\Delta x/2)}}
+  \label{eq:lec09:cn-amplification}
+\end{equation}
+Since $\abs{\xi}<1$ for all $\alpha>0$ and all $k$, the scheme is
+unconditionally stable.  Because the stencil is symmetric about
+time $n+\frac{1}{2}$, the local truncation error is $\bigO{(\Delta t)^2}$
+— the scheme is second-order accurate in time.
+
+\textit{Physical significance:} Crank--Nicholson is the gold standard
+for the diffusion equation: unconditionally stable, second-order in
+time, and only modestly more expensive than BTCS.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{2D Diffusion and the ADI Method}\label{subsec:lec09:adi}
+
+\subsubsection*{Physical Motivation}
+Extending Crank--Nicholson to two spatial dimensions,
+\begin{equation}
+  \partial_t u = D(\partial_x^2 u + \partial_y^2 u),
+  \label{eq:lec09:2d-diffusion}
+\end{equation}
+leads to a large system that is no longer tridiagonal; its direct
+solution is expensive.  The \emph{Alternating Direction Implicit}
+(ADI) method splits each time step into two half-steps, treating
+one direction implicitly at each half-step.
+
+Define $\alpha = D\Delta t/\Delta^2$ with $\Delta x=\Delta y=\Delta$.
+Introduce the finite-difference operators
+\begin{equation}
+  \delta_x^2 u_{i,j} \equiv u_{i-1,j}-2u_{i,j}+u_{i+1,j},
+  \qquad
+  \delta_y^2 u_{i,j} \equiv u_{i,j-1}-2u_{i,j}+u_{i,j+1}.
+  \label{eq:lec09:finite-diff-ops}
+\end{equation}
+The two ADI half-steps are
+\begin{align}
+  u_{i,j}^{n+1/2}
+  &= u_{i,j}^{n}
+   + \frac{\alpha}{2}\!\left(
+       \delta_x^2 u_{i,j}^{n+1/2}
+       + \delta_y^2 u_{i,j}^{n}
+     \right),
+  \label{eq:lec09:adi-step1}\\
+  u_{i,j}^{n+1}
+  &= u_{i,j}^{n+1/2}
+   + \frac{\alpha}{2}\!\left(
+       \delta_x^2 u_{i,j}^{n+1/2}
+       + \delta_y^2 u_{i,j}^{n+1}
+     \right).
+  \label{eq:lec09:adi-step2}
+\end{align}
+In each half-step the implicit direction reduces to a set of independent
+tridiagonal solves along lines parallel to the implicit axis, keeping
+the cost $\bigO{N^2}$ per full step.
+
+\begin{equation}
+  \boxed{\text{ADI: unconditionally stable; }\bigO{N^2}\text{ per step}}
+  \label{eq:lec09:adi-cost}
+\end{equation}
+
+\textit{Physical significance:} ADI is an instance of \emph{operator
+splitting}: a complicated multi-dimensional problem is broken into a
+sequence of simpler one-dimensional problems.  Operator splitting
+underlies many algorithms in fluid mechanics and plasma physics.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Time-Dependent Schrödinger Equation}
+\label{subsec:lec09:schrodinger}
+
+\subsubsection*{Physical Motivation}
+The time-dependent Schrödinger equation governs the quantum-mechanical
+evolution of a wave packet:
+\begin{equation}
+  i\partial_t\psi = H\psi,
+  \qquad
+  H = -\partial_x^2 + V(x),
+  \label{eq:lec09:tdse}
+\end{equation}
+in units $\hbar=2m=1$.  Any good numerical scheme must conserve the
+norm $\int|\psi|^2\,dx=1$ at all times.
+
+\paragraph{FTCS applied to Schrödinger.}
+The FTCS update is
+\begin{equation}
+  \psi_j^{n+1} = (1-iH\Delta t)\psi_j^{n},
+  \label{eq:lec09:tdse-ftcs}
+\end{equation}
+with von Neumann amplification factor $|\xi|>1$ for every $k$ — the
+FTCS scheme is \emph{always unstable} for the Schrödinger equation and
+cannot conserve the norm.
+
+\paragraph{Cayley form (Crank--Nicholson for Schrödinger).}
+Apply Crank--Nicholson to Eq.~\eqref{eq:lec09:tdse}:
+\begin{equation}
+  \left(1+i\frac{H\Delta t}{2}\right)\psi^{n+1}
+  = \left(1-i\frac{H\Delta t}{2}\right)\psi^{n}.
+  \label{eq:lec09:cayley-raw}
+\end{equation}
+This is known as the \emph{Cayley form}:
+\begin{equation}
+  \boxed{
+  \psi^{n+1}
+  = \frac{1-i(H\Delta t/2)}{1+i(H\Delta t/2)}\,\psi^{n}}
+  \label{eq:lec09:cayley}
+\end{equation}
+The factor in front of $\psi^n$ is a \emph{unitary} operator because
+$(1-iz)/(1+iz)$ has modulus one for any real $z$.  Hence:
+\begin{equation}
+  \boxed{\norm{\psi^{n+1}} = \norm{\psi^{n}}
+  \quad\text{(norm conserved exactly)}}
+  \label{eq:lec09:norm-conservation}
+\end{equation}
+
+\textit{Physical significance:} the Cayley/Crank--Nicholson scheme
+exactly preserves unitarity at the discrete level.  In practice it
+reduces to a tridiagonal solve at each time step — the same structure
+as BTCS for the diffusion equation, but now the matrix entries are
+complex.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Conservation Laws and the Advection Equation}
+\label{subsec:lec09:advection}
+
+\subsubsection*{Physical Motivation}
+A conservation law states that the rate of change of a density $u$
+equals minus the divergence of a flux $F(u)$:
+\begin{equation}
+  \partial_t u = -\partial_x F(u).
+  \label{eq:lec09:conservation-law}
+\end{equation}
+The diffusion equation is a conservation law with $F=-D\partial_x u$.
+The simplest hyperbolic conservation law is the \emph{advection
+equation}, which describes a wave profile moving rigidly at speed $v$:
+\begin{equation}
+  \partial_t u = -v\,\partial_x u,
+  \qquad
+  u(x,t) = f(x-vt).
+  \label{eq:lec09:advection}
+\end{equation}
+
+\paragraph{FTCS for advection — always unstable.}
+Applying FTCS to Eq.~\eqref{eq:lec09:advection}:
+\begin{equation}
+  u_j^{n+1} = u_j^n
+  - \frac{v\Delta t}{2\Delta x}\!\left(u_{j+1}^n - u_{j-1}^n\right).
+  \label{eq:lec09:advection-ftcs}
+\end{equation}
+Von Neumann analysis gives
+$\xi = 1-i\frac{v\Delta t}{\Delta x}\sin(k\Delta x)$,
+so $\abs{\xi}^2 = 1 + \left(\frac{v\Delta t}{\Delta x}\right)^2\sin^2(k\Delta x) > 1$
+for all non-zero $v$: the FTCS scheme is unconditionally unstable for
+advection.
+
+\paragraph{Lax scheme.}
+Replace $u_j^n$ in the time derivative by the spatial average of its
+neighbours:
+\begin{equation}
+  u_j^{n+1}
+  = \tfrac{1}{2}\!\left(u_{j+1}^n + u_{j-1}^n\right)
+  - \frac{v\Delta t}{2\Delta x}\!\left(u_{j+1}^n-u_{j-1}^n\right).
+  \label{eq:lec09:lax}
+\end{equation}
+Von Neumann analysis yields
+\begin{equation}
+  \abs{\xi}^2
+  = \cos^2(k\Delta x)
+    + \left(\frac{v\Delta t}{\Delta x}\right)^2\!\sin^2(k\Delta x) \leq 1
+  \label{eq:lec09:lax-stability}
+\end{equation}
+provided the \emph{Courant–Friedrichs–Lewy (CFL) condition} holds:
+\begin{equation}
+  \boxed{
+  \frac{\abs{v}\Delta t}{\Delta x} \leq 1}
+  \label{eq:lec09:cfl}
+\end{equation}
+
+\textit{Physical significance:} the CFL condition has a clean physical
+interpretation — the numerical domain of dependence of a grid point
+(the stencil width in space, $\Delta x$) must include the physical
+domain of dependence (the distance $\abs{v}\Delta t$ that information
+travels in one time step).  If $\Delta t$ is too large, the stencil
+misses the physically relevant upstream information, causing the scheme
+to fail.
+
+When the CFL condition is violated ($\abs{v}\Delta t/\Delta x > 1$),
+information from grid points $j-1$ and $j+1$ does not reach grid point
+$j$ fast enough: the numerical scheme receives data from outside the
+physical domain of influence, and amplification grows.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Summary of Stability Conditions}
+\label{subsec:lec09:summary}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{lllc}
+  \toprule
+  Equation & Scheme & Stability & Order \\
+  \midrule
+  Diffusion & FTCS & $\alpha\leq\tfrac{1}{2}$ & $O(\Delta t,\,\Delta x^2)$ \\
+  Diffusion & BTCS & unconditional & $O(\Delta t,\,\Delta x^2)$ \\
+  Diffusion & Crank--Nicholson & unconditional & $O(\Delta t^2,\,\Delta x^2)$ \\
+  Schrödinger & Cayley form & unconditional, unitary & $O(\Delta t^2,\,\Delta x^2)$ \\
+  Advection & FTCS & never stable & $O(\Delta t,\,\Delta x^2)$ \\
+  Advection & Lax & CFL: $\abs{v}\Delta t/\Delta x\leq 1$ & $O(\Delta t,\,\Delta x)$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+  \item \textit{Computational Physics}, Mark Newman --- Ch.\ 9.3--9.4
+    (diffusion, stability, implicit methods).
+  \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 19.2
+    (FTCS and Crank--Nicholson for diffusion) and Ch.\ 19.1
+    (advection, CFL condition).
+  \item K.W. Morton \& D.F. Mayers, \textit{Numerical Solution of
+    Partial Differential Equations} --- Ch.\ 4 (parabolic equations)
+    and Ch.\ 6 (hyperbolic equations).
+\end{itemize}

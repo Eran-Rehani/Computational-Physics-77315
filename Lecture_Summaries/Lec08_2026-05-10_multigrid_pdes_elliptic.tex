@@ -1,0 +1,325 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 08 — Multigrid Method and Introduction to PDEs
+%% 77315 — Computational Physics
+%% Date: 10/05/2026
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 08 — Multigrid Method and Introduction to
+  Partial Differential Equations}\label{sec:lec08}
+
+\begin{center}
+\begin{tabular}{ll}
+  \textbf{Date:}\quad 10/05/2026 & \\
+\end{tabular}
+\end{center}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+Lecture~\ref{sec:lec07} introduced the relaxation method for boundary-value
+problems; the Gauss–Seidel iteration was identified as the workhorse.
+This lecture begins by explaining \emph{why} Gauss–Seidel converges
+slowly on large grids and how the \emph{multigrid} algorithm repairs
+the deficiency by combining solutions on grids of different spacings.
+The second half of the lecture opens a new chapter: \emph{partial
+differential equations (PDEs)}. We classify PDEs into elliptic,
+parabolic, and hyperbolic types, discuss boundary and initial
+conditions, discretise the two-dimensional Poisson equation, and
+study the Jacobi, Gauss–Seidel, and successive over-relaxation (SOR)
+iterative solvers.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Motivation: Why Gauss–Seidel Converges Slowly}
+\label{subsec:lec08:gs-slow}
+
+\subsubsection*{Physical Motivation}
+The Gauss–Seidel iteration at every grid point replaces $u_{i,j}$ by
+the average of its four neighbours. This operation is a local smoother:
+it rapidly damps oscillations whose wavelength is comparable to the
+grid spacing $h$, but it barely touches long-wavelength errors, whose
+smoothing rate is proportional to $h^2$.  For an $N\times N$ grid with
+$h=1/N$, reaching a fixed accuracy requires $\bigO{N^2}$ iterations,
+each costing $\bigO{N^2}$ work, giving a total cost of
+$\bigO{N^4}$ — prohibitive even for moderate $N$.
+
+The key observation is that, on a coarser grid with spacing $H=2h$,
+the same long-wavelength mode is a \emph{short}-wavelength mode and
+is therefore damped quickly by Gauss–Seidel.  Multigrid exploits this
+by alternating between fine and coarse grids.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{The Multigrid Algorithm}\label{subsec:lec08:multigrid}
+
+\subsubsection*{Physical Motivation}
+We want to solve the linear problem
+\begin{equation}
+  \mathcal{L}_h u_h = f_h,
+  \label{eq:lec08:fine-problem}
+\end{equation}
+where $\mathcal{L}_h$ is the discrete elliptic operator on a grid of
+spacing $h$ (for example $\mathcal{L}_h = \Delta^2_h$ for the Poisson
+equation, $f_h = \rho_h$).
+
+\paragraph{Key quantities.}
+Let $\tilde{u}_h$ denote the current approximation.  Define:
+\begin{align}
+  v_h &= u_h - \tilde{u}_h \quad \text{(error)},
+  \label{eq:lec08:error}\\
+  d_h &= \mathcal{L}_h\tilde{u}_h - f_h \quad \text{(defect / residual)}.
+  \label{eq:lec08:defect}
+\end{align}
+Because $\mathcal{L}_h$ is linear,
+\begin{equation}
+  \mathcal{L}_h v_h = -d_h.
+  \label{eq:lec08:error-equation}
+\end{equation}
+
+\textit{Physical significance:} instead of solving for the full
+solution $u_h$, we need only solve for the error correction $v_h$,
+which satisfies the same type of equation driven by the current
+residual.
+
+\paragraph{Coarse-grid correction.}
+Pass to a grid of spacing $H=2h$.  Define the \emph{restriction}
+operator $\mathcal{R}$ that maps a fine-grid function to the coarse grid:
+\begin{equation}
+  d_H = \mathcal{R}\,d_h.
+  \label{eq:lec08:restriction}
+\end{equation}
+Solve the coarse-grid error equation approximately to obtain
+$\tilde{v}_H$, then \emph{prolong} the correction back to the fine
+grid using the prolongation operator $\mathcal{P}$:
+\begin{equation}
+  \tilde{v}_h = \mathcal{P}\,\tilde{v}_H.
+  \label{eq:lec08:prolongation}
+\end{equation}
+Update the fine-grid approximation:
+\begin{equation}
+  \boxed{\tilde{u}_h^{\mathrm{new}} = \tilde{u}_h + \tilde{v}_h}
+  \label{eq:lec08:update}
+\end{equation}
+
+\textit{Physical significance:} the coarse grid corrects the
+smooth (long-wavelength) components of the error at low cost because
+on the coarse grid these components are short-wavelength and are
+smoothed efficiently.
+
+\paragraph{One multigrid cycle.}
+\begin{enumerate}
+  \item \textbf{Pre-smoothing}: apply $i_1$ Gauss–Seidel iterations
+    to Eq.~\eqref{eq:lec08:fine-problem} to obtain $\tilde{u}_h$.
+  \item \textbf{Compute defect}: $d_h = \mathcal{L}_h\tilde{u}_h - f_h$.
+  \item \textbf{Restrict}: $d_H = \mathcal{R}\,d_h$.
+  \item \textbf{Solve coarse}: obtain $\tilde{v}_H\approx -\mathcal{L}_H^{-1}d_H$
+    (recursively or by direct solve at the coarsest level, marked
+    E in the cycle diagrams).
+  \item \textbf{Prolong}: $\tilde{v}_h = \mathcal{P}\,\tilde{v}_H$.
+  \item \textbf{Update}: $\tilde{u}_h^{\mathrm{new}}=\tilde{u}_h+\tilde{v}_h$.
+  \item \textbf{Post-smoothing}: apply $i_1$ Gauss–Seidel iterations.
+\end{enumerate}
+
+The full recursion over $L$ grid levels is a \emph{V-cycle} (one visit
+to each coarser level) or a \emph{W-cycle} (two visits).  For an
+$N\times N$ grid:
+\begin{equation}
+  \boxed{\text{Total cost per multigrid cycle} = \bigO{N^2}}
+  \label{eq:lec08:multigrid-cost}
+\end{equation}
+
+\textit{Physical significance:} because each cycle reduces all error
+components by a fixed factor independent of $N$, a fixed number of
+cycles suffices for any prescribed accuracy, making the overall
+algorithm $\bigO{N^2}$ — optimal up to the unavoidable cost of writing
+the answer.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Classification of Partial Differential Equations}
+\label{subsec:lec08:classification}
+
+\subsubsection*{Physical Motivation}
+Many fundamental laws of physics — electrostatics, heat conduction,
+fluid mechanics, quantum mechanics — are expressed as PDEs.  The
+numerical strategy (explicit vs implicit time-stepping, type of
+boundary condition, stability criterion) depends strongly on which
+class a PDE belongs to.
+
+A second-order PDE in two variables is classified according to the sign
+of its discriminant.  The three canonical types and their physical
+representatives are:
+
+\begin{itemize}
+  \item \textbf{Elliptic} (both eigenvalues same sign): stationary
+    problems. Prototype: Poisson equation
+    \begin{equation}
+      \boxed{\frac{\partial^2 u}{\partial x^2}
+        +\frac{\partial^2 u}{\partial y^2}
+        = \rho(x,y)}
+      \label{eq:lec08:poisson}
+    \end{equation}
+    \textit{Physical significance:} describes electrostatic potential
+    with charge density $\rho$, steady-state temperature, etc.  The
+    solution at each point is influenced by the entire domain —
+    ``action at a distance''.
+
+  \item \textbf{Parabolic} (one zero eigenvalue): diffusion/heat
+    problems with a first-order time derivative. Prototype:
+    \begin{equation}
+      \boxed{\frac{\partial u}{\partial t}
+        = \frac{\partial}{\partial x}
+          \!\left(D\frac{\partial u}{\partial x}\right)}
+      \label{eq:lec08:diffusion}
+    \end{equation}
+    \textit{Physical significance:} information propagates at
+    infinite speed; the solution smooths out irregularities
+    exponentially fast.
+
+  \item \textbf{Hyperbolic} (eigenvalues of opposite sign): wave
+    problems with a second-order time derivative. Prototype:
+    \begin{equation}
+      \boxed{\frac{\partial^2 u}{\partial t^2}
+        = v^2\frac{\partial^2 u}{\partial x^2}}
+      \label{eq:lec08:wave}
+    \end{equation}
+    \textit{Physical significance:} information propagates at finite
+    speed $v$; wave fronts and shocks can form.
+\end{itemize}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Boundary Conditions}\label{subsec:lec08:bcs}
+
+\subsubsection*{Physical Motivation}
+For an elliptic PDE defined in a domain, the solution is uniquely
+determined once appropriate boundary conditions are supplied.
+Two standard types are:
+\begin{itemize}
+  \item \textbf{Dirichlet}: the function value is specified on the
+    boundary, $u\big|_{\partial\Omega}=g$.
+  \item \textbf{Neumann}: the normal derivative is specified,
+    $\partial u/\partial n\big|_{\partial\Omega}=g$.
+\end{itemize}
+For \emph{initial-value} problems (parabolic and hyperbolic) the
+function and, where relevant, its time derivative are given on the
+initial surface and boundary conditions are applied on the spatial
+boundary.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Discretising the 2D Poisson Equation}
+\label{subsec:lec08:poisson-discretisation}
+
+\subsubsection*{Physical Motivation}
+We want to solve
+$\partial^2_x u + \partial^2_y u = \rho(x,y)$
+numerically on a square domain $[0,1]^2$.  The approach is to
+replace the partial derivatives by finite differences on a uniform
+grid.
+
+\paragraph{Grid.}
+Divide each axis into $N$ equal intervals of width $h=1/N$.  Let
+\begin{equation}
+  u_{i,j} = u(x_i,y_j),
+  \qquad
+  \rho_{i,j} = \rho(x_i,y_j),
+  \qquad
+  x_i = ih,\;y_j = jh.
+  \label{eq:lec08:grid}
+\end{equation}
+Applying the symmetric second-derivative formula in both directions
+gives the \emph{five-point stencil}:
+\begin{equation}
+  \boxed{
+  u_{i+1,j}+u_{i-1,j}+u_{i,j+1}+u_{i,j-1}-4u_{i,j}
+  = h^2\rho_{i,j}}
+  \label{eq:lec08:five-point}
+\end{equation}
+with local truncation error $\bigO{h^2}$.
+
+\textit{Physical significance:} each interior grid point produces one
+equation; with $N\times N$ unknowns and Dirichlet boundary conditions
+on all sides, the system is square with $N^2$ equations and $N^2$
+unknowns.  In matrix form it is a sparse, banded, negative-definite
+system.  Even for $N=100$ this is a $10\,000\times10\,000$ matrix —
+direct Gaussian elimination costs $\bigO{N^6}$ which is too
+expensive; iterative solvers are essential.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Iterative Solvers for the Poisson System}
+\label{subsec:lec08:iterative}
+
+\subsubsection*{Physical Motivation}
+The five-point system Eq.~\eqref{eq:lec08:five-point} can be solved
+by rearranging for $u_{i,j}$:
+\begin{equation}
+  u_{i,j}
+  = \tfrac{1}{4}\!\left(
+      u_{i+1,j}+u_{i-1,j}+u_{i,j+1}+u_{i,j-1}
+    \right)
+    -\tfrac{h^2}{4}\rho_{i,j}.
+  \label{eq:lec08:jacobi-update}
+\end{equation}
+This is a \emph{local average} — the solution at each point is the
+mean of its four neighbours minus a source term.  Iterating this
+formula gives three increasingly powerful methods.
+
+\paragraph{Jacobi iteration.}
+All grid values are updated simultaneously using only old values:
+\begin{equation}
+  u_{i,j}^{n+1}
+  = \tfrac{1}{4}\!\left(
+      u_{i+1,j}^{n}+u_{i-1,j}^{n}+u_{i,j+1}^{n}+u_{i,j-1}^{n}
+    \right)
+    -\tfrac{h^2}{4}\rho_{i,j}.
+  \label{eq:lec08:jacobi}
+\end{equation}
+Convergence requires $\tfrac{1}{2}pN^2$ iterations for precision
+$10^{-p}$.
+
+\paragraph{Gauss–Seidel iteration with red-black ordering.}
+Update $u_{i,j}$ using the most recent values of its neighbours.
+Using a \emph{red-black} (checkerboard) ordering — first all
+$(i+j)$-even nodes (``red''), then all $(i+j)$-odd nodes (``black'')
+— the red nodes depend only on black neighbours and vice versa, so each
+colour can be updated simultaneously:
+\begin{equation}
+  u_{i,j}^{n+1}
+  = \tfrac{1}{4}\!\left(
+      u_{i+1,j}^{n+1}+u_{i-1,j}^{n+1}
+      +u_{i,j+1}^{n+1}+u_{i,j-1}^{n+1}
+    \right)
+    -\tfrac{h^2}{4}\rho_{i,j}
+  \label{eq:lec08:gauss-seidel}
+\end{equation}
+(where newly updated values are used as soon as they are
+available). Gauss–Seidel converges roughly twice as fast as Jacobi.
+
+\paragraph{Successive Over-Relaxation (SOR).}
+Compute the Gauss–Seidel update $u^*_{i,j}$ and then over-shoot:
+\begin{equation}
+  u_{i,j}^{n+1}
+  = w\,u^*_{i,j} + (1-w)\,u_{i,j}^{n},
+  \qquad 1 < w < 2.
+  \label{eq:lec08:sor}
+\end{equation}
+\begin{equation}
+  \boxed{w_{\mathrm{opt}}
+    \approx \frac{2}{1+\sin(\pi/N)}}
+  \label{eq:lec08:sor-optimal}
+\end{equation}
+
+\textit{Physical significance:} with optimal $w$, SOR needs only
+$\bigO{N}$ iterations instead of $\bigO{N^2}$, reducing the total
+cost for the Poisson equation to $\bigO{N^3}$.  For $w=1$ one
+recovers plain Gauss–Seidel; $w=2$ is unstable.  Under-relaxation
+($0<w<1$) is used when the plain Gauss–Seidel iterations diverge
+(e.g.\ for nonlinear problems).
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Recommended Reading}
+\begin{itemize}
+  \item \textit{Computational Physics}, Mark Newman --- Ch.\ 9.1--9.3
+    (relaxation, Gauss–Seidel, over-relaxation for PDEs).
+  \item \textit{Numerical Recipes}, W.H. Press et al.\ --- Ch.\ 19.1
+    (relaxation methods for PDEs) and Ch.\ 20.6 (multigrid methods).
+  \item K.W. Morton \& D.F. Mayers, \textit{Numerical Solution of
+    Partial Differential Equations} --- Ch.\ 2--3 (classification and
+    elliptic equations).
+\end{itemize}
