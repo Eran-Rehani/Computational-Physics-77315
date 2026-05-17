@@ -33,7 +33,7 @@
 
 %% ── Theorem (blue left bar) ──────────────────────────────────────────────────
 \tcbuselibrary{theorems,skins,hooks}
-\newtcbtheorem[number within=section]{Theorem}{Theorem}{
+\newtcbtheorem[number within=section]{Theorem}{Physical Law}{
   enhanced, breakable,
   colback=mytheorembg, frame hidden, boxrule=0sp,
   borderline west={2pt}{0pt}{mytheoremfr},
@@ -45,7 +45,7 @@
 }{th}
 
 %% ── Lemma (green left bar) ───────────────────────────────────────────────────
-\newtcbtheorem[use counter from=Theorem, number within=section]{Lemma}{Lemma}{
+\newtcbtheorem[use counter from=Theorem, number within=section]{Lemma}{Mathematical Result}{
   enhanced, breakable,
   colback=myg!10, frame hidden, boxrule=0sp,
   borderline west={2pt}{0pt}{myg},
@@ -57,7 +57,7 @@
 }{th}
 
 %% ── Corollary (purple left bar) ──────────────────────────────────────────────
-\newtcbtheorem[use counter from=Theorem, number within=section]{Corollary}{Corollary}{
+\newtcbtheorem[use counter from=Theorem, number within=section]{Corollary}{Consequence}{
   enhanced, breakable,
   colback=myp!10, frame hidden, boxrule=0sp,
   borderline west={2pt}{0pt}{myp!60!black},
@@ -81,7 +81,7 @@
 }{th}
 
 %% ── Definition (red floating title) ─────────────────────────────────────────
-\newtcbtheorem[number within=section]{Definition}{Definition}{
+\newtcbtheorem[number within=section]{Definition}{Physical Concept}{
   enhanced, before skip=2mm, after skip=2mm,
   colback=red!5, colframe=red!80!black, boxrule=0.5mm,
   attach boxed title to top left={xshift=1cm,yshift*=1mm-\tcboxedtitleheight},
@@ -101,7 +101,7 @@
 }{def}
 
 %% ── Example (teal framed) ────────────────────────────────────────────────────
-\newtcbtheorem[number within=section]{Example}{Example}{
+\newtcbtheorem[number within=section]{Example}{Worked Example}{
   colback=myexamplebg, breakable,
   colframe=myexamplefr, coltitle=myexampleti, boxrule=1pt,
   sharp corners, detach title,
@@ -111,7 +111,7 @@
 }{ex}
 
 %% ── Open Question (purple floating title) ────────────────────────────────────
-\newtcbtheorem[number within=section]{OpenQuestion}{Open Question}{
+\newtcbtheorem[number within=section]{OpenQuestion}{Open Problem}{
   enhanced, before skip=2mm, after skip=2mm,
   colback=myp!5, colframe=myp!80!black, boxrule=0.5mm,
   attach boxed title to top left={xshift=1cm,yshift*=1mm-\tcboxedtitleheight},
