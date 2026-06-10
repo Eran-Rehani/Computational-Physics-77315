@@ -14,8 +14,14 @@
 %% ── Page style ───────────────────────────────────────────────────────────────
 \pagestyle{fancy}
 \fancyhf{}
-\lhead{\small 77315 — Computational Physics}
-\rhead{\small \thesubsection}
+\setlength{\headheight}{14pt}
+% Left header = current \part; right header = current \section/\subsection
+\let\oldpart\part
+\renewcommand{\part}[1]{\oldpart{#1}\markboth{#1}{}}
+\renewcommand{\sectionmark}[1]{\markright{#1}}
+\renewcommand{\subsectionmark}[1]{\markright{#1}}
+\lhead{\small\nouppercase{\leftmark}}
+\rhead{\small\nouppercase{\rightmark}}
 \cfoot{\thepage}
 
 %% ── Theorem environments (eye-candy tcolorbox) ───────────────────────────────
