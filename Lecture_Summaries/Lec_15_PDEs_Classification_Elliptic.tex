@@ -1,0 +1,110 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 15 — PDEs: Classification and Elliptic Equations
+%% 77315 — Computational Physics
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 15 — PDE Classification \& Elliptic Equations}\label{sec:lec15}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+We classify second-order PDEs and focus on \emph{elliptic} equations
+(Poisson/Laplace).  Finite-difference discretisation converts the PDE
+into a large sparse linear system.  Three iterative solvers are
+discussed: Jacobi, Gauss–Seidel, and Successive Over-Relaxation (SOR).
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Classification of Second-Order PDEs}\label{subsec:lec15:class}
+
+A general 2nd-order PDE in two variables $u(x,y)$:
+\begin{equation}
+  A\,u_{xx} + B\,u_{xy} + C\,u_{yy} + \ldots = 0.
+  \label{eq:lec15:pde}
+\end{equation}
+The discriminant $\Delta = B^2 - 4AC$ determines the type:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+$\Delta$ & Type & Example \\
+\midrule
+$>0$ & Hyperbolic & Wave equation $u_{tt} = c^2 u_{xx}$ \\
+$=0$ & Parabolic  & Diffusion $u_t = D\,u_{xx}$ \\
+$<0$ & Elliptic   & Poisson $u_{xx}+u_{yy}=f$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Elliptic problems are global BVPs (no time direction); hyperbolic and
+parabolic problems evolve in time.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Poisson Equation and Finite Differences}\label{subsec:lec15:poisson}
+
+The 2D Poisson equation on a grid with $N$ interior points per side:
+\begin{equation}
+  \nabla^2 u = \frac{\partial^2 u}{\partial x^2}
+              +\frac{\partial^2 u}{\partial y^2} = f(x,y).
+  \label{eq:lec15:poisson}
+\end{equation}
+Discretise with spacing $h = 1/(N+1)$ using 5-point stencil:
+\begin{equation}
+  \frac{u_{i+1,j}+u_{i-1,j}+u_{i,j+1}+u_{i,j-1}-4u_{i,j}}{h^2} = f_{ij}.
+  \label{eq:lec15:stencil}
+\end{equation}
+This generates an $N^2\times N^2$ sparse linear system
+$A\mathbf{u}=\mathbf{b}$ with at most 5 non-zero entries per row.
+Direct solvers require $\bigO{N^4}$ time; iterative methods are preferred.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Jacobi Iteration}\label{subsec:lec15:jacobi}
+
+Rearrange~\eqref{eq:lec15:stencil} to update $u_{ij}$ from neighbours:
+\begin{equation}
+  u_{ij}^{\rm new} = \tfrac{1}{4}\!\left(
+    u_{i+1,j}+u_{i-1,j}+u_{i,j+1}+u_{i,j-1}-h^2 f_{ij}
+  \right).
+  \label{eq:lec15:jacobi}
+\end{equation}
+All updates use old values.  Convergence to precision $10^{-p}$ requires
+approximately
+\begin{equation}
+  n_{\rm iter} \approx \tfrac{1}{2}\,p\,N^2
+  \label{eq:lec15:jacobi_iters}
+\end{equation}
+iterations — very slow for large $N$.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Gauss--Seidel Iteration}\label{subsec:lec15:gs}
+
+Same as Jacobi but use updated values \emph{immediately}:
+\begin{equation}
+  u_{ij}^{\rm new} = \tfrac{1}{4}\!\left(
+    u_{i+1,j}^{\rm old}+u_{i-1,j}^{\rm new}+u_{i,j+1}^{\rm old}
+    +u_{i,j-1}^{\rm new}-h^2 f_{ij}
+  \right).
+  \label{eq:lec15:gs}
+\end{equation}
+Gauss–Seidel converges about \textbf{twice as fast} as Jacobi and
+requires no extra storage.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Successive Over-Relaxation (SOR)}\label{subsec:lec15:sor}
+
+Introduce a relaxation parameter $\omega\in(1,2)$ to accelerate
+Gauss–Seidel:
+\begin{equation}
+  u_{ij}^{\rm new} = (1-\omega)\,u_{ij}^{\rm old}
+                   + \omega\,u_{ij}^{\rm GS},
+  \label{eq:lec15:sor}
+\end{equation}
+where $u_{ij}^{\rm GS}$ is the Gauss–Seidel update.  The optimal
+relaxation parameter for the Poisson equation on an $N\times N$ grid is
+\begin{equation}
+  \omega_{\rm opt} = \frac{2}{1+\sin(\pi/(N+1))}.
+  \label{eq:lec15:omega_opt}
+\end{equation}
+With optimal $\omega$, SOR converges in $\bigO{N}$ iterations rather
+than $\bigO{N^2}$ — a spectacular speedup for large grids.
+
+\nt{$\omega=1$ recovers Gauss–Seidel.  $\omega\ge 2$ is unconditionally divergent.  Choosing $\omega$ slightly above 1 is always safe if $\omega_{\rm opt}$ is unknown.}

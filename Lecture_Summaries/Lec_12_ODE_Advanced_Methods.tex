@@ -1,0 +1,122 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 12 — Advanced ODE Methods
+%% 77315 — Computational Physics
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 12 — Advanced ODE Methods}\label{sec:lec12}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+Building on Euler's method, we develop higher-order integrators for
+initial-value problems $\dot{y}=f(x,y)$.  The main families are:
+\emph{Adams multistep} methods (Adams–Bashforth explicit,
+Adams–Moulton implicit, predictor–corrector combinations) and
+\emph{Runge–Kutta} single-step methods (RK2, RK3, RK4).
+We also discuss adaptive step-size control via Richardson
+extrapolation and the treatment of stiff ODEs.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Adams--Bashforth (Explicit Multistep)}\label{subsec:lec12:ab}
+
+Adams–Bashforth methods use past values of $f$ to extrapolate.
+The 2-step and 4-step formulae are
+
+\begin{align}
+  y_{n+1} &= y_n + h\left[\tfrac{3}{2}f_n - \tfrac{1}{2}f_{n-1}\right]
+  \quad \bigO{h^3},
+  \label{eq:lec12:ab2}\\
+  y_{n+1} &= y_n + \frac{h}{24}\left[55f_n - 59f_{n-1}
+              + 37f_{n-2} - 9f_{n-3}\right]
+  \quad \bigO{h^5}.
+  \label{eq:lec12:ab4}
+\end{align}
+
+The 4-step method requires only \emph{one} new function evaluation
+per step (the previous three values are reused).  Starting values
+$y_1,y_2,y_3$ must be obtained by a Runge–Kutta method.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Adams--Moulton (Implicit Multistep)}\label{subsec:lec12:am}
+
+The implicit Adams–Moulton formula uses $f_{n+1}$ (the unknown):
+\begin{equation}
+  y_{n+1} = y_n + \frac{h}{24}\left[9f_{n+1} + 19f_n
+             - 5f_{n-1} + f_{n-2}\right]
+  \quad \bigO{h^5}.
+  \label{eq:lec12:am4}
+\end{equation}
+Because $f_{n+1}$ depends on $y_{n+1}$, \eqref{eq:lec12:am4} is an
+implicit equation.  For non-stiff problems it is solved by the
+\emph{predictor–corrector} approach.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Predictor--Corrector}\label{subsec:lec12:pc}
+
+\begin{enumerate}
+  \item \textbf{Predict} $y_{n+1}^{(0)}$ with Adams–Bashforth~\eqref{eq:lec12:ab4}.
+  \item Evaluate $f_{n+1}^{(0)} = f(x_{n+1}, y_{n+1}^{(0)})$.
+  \item \textbf{Correct} with Adams–Moulton~\eqref{eq:lec12:am4}.
+  \item (Optionally iterate correction once more.)
+\end{enumerate}
+
+The combination achieves 5th-order accuracy with four function
+evaluations per step (same as the four-step AB formula alone), but
+the implicit corrector dramatically improves stability.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Runge--Kutta Methods}\label{subsec:lec12:rk}
+
+RK methods are single-step: no past values needed.
+
+\subsubsection*{RK2 (Midpoint method)}
+\begin{equation}
+  k_1 = hf(x_n, y_n),\quad
+  k_2 = hf\!\left(x_n+\tfrac{h}{2},\,y_n+\tfrac{k_1}{2}\right),\quad
+  y_{n+1} = y_n + k_2 + \bigO{h^3}.
+  \label{eq:lec12:rk2}
+\end{equation}
+
+\subsubsection*{RK4 (Classical)}
+\begin{align}
+  k_1 &= hf(x_n,\,y_n),\notag\\
+  k_2 &= hf(x_n+\tfrac{h}{2},\,y_n+\tfrac{k_1}{2}),\notag\\
+  k_3 &= hf(x_n+\tfrac{h}{2},\,y_n+\tfrac{k_2}{2}),\notag\\
+  k_4 &= hf(x_n+h,\,y_n+k_3),\notag\\
+  y_{n+1} &= y_n + \tfrac{1}{6}(k_1+2k_2+2k_3+k_4) + \bigO{h^5}.
+  \label{eq:lec12:rk4}
+\end{align}
+
+RK4 costs 4 function evaluations per step and achieves
+$\bigO{h^5}$ local truncation error.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Adaptive Step Size and Richardson Extrapolation}
+\label{subsec:lec12:adaptive}
+
+\subsubsection*{Step-doubling / Richardson extrapolation}
+Take one step of size $h$ to get $y^{(h)}$, then two steps of size
+$h/2$ to get $y^{(h/2)}$.  For a method of order $p$:
+\begin{equation}
+  \text{error} \approx \frac{y^{(h/2)}-y^{(h)}}{2^p - 1}.
+  \label{eq:lec12:rich}
+\end{equation}
+If the error exceeds the tolerance, halve $h$; if it is much smaller
+than the tolerance, double $h$.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Stiff ODEs}\label{subsec:lec12:stiff}
+
+A system is \emph{stiff} when its Jacobian has eigenvalues with widely
+separated magnitudes.  Explicit methods (RK4, Adams–Bashforth) require
+$h \lesssim 1/|\lambda_{\max}|$, which may be extremely small even though
+the solution of interest evolves on the slow timescale $1/|\lambda_{\min}|$.
+
+\subsubsection*{Implicit and semi-implicit schemes}
+Fully implicit methods (e.g.\ backward Euler, fully implicit
+Adams–Moulton) have much larger stability regions and can handle
+stiff problems with step sizes controlled by accuracy, not stability.
+For systems where $f$ can be split as $f = f_{\rm fast} + f_{\rm slow}$,
+\emph{semi-implicit} (IMEX) schemes treat only the fast part implicitly.
+
+\nt{Stiffness is common in chemistry (fast reaction rates), nuclear physics, and coupled oscillators.  Always check whether an explicit integrator requires an unreasonably small $h$ before declaring it ``inaccurate''.}

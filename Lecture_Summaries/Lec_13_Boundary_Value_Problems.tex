@@ -1,0 +1,108 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 13 — Boundary Value Problems and the Numerov Method
+%% 77315 — Computational Physics
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 13 — Boundary Value Problems \& Numerov Method}\label{sec:lec13}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+A \emph{boundary value problem} (BVP) specifies conditions at both
+ends of the domain rather than only at the initial point.  We study
+the \emph{shooting method} and its extension
+\emph{shooting to a fitting point}.  For special problems of the
+form $y'' = f(x)\,y + g(x)$ (including the Schrödinger equation)
+the \emph{Numerov method} achieves $\bigO{h^6}$ accuracy.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Shooting Method}\label{subsec:lec13:shooting}
+
+\subsubsection*{Setup}
+Consider a 2nd-order ODE $y'' = g(x,y,y')$ with boundary conditions
+$y(a)=\alpha$, $y(b)=\beta$.  Rewrite as a 1st-order system:
+$\mathbf{y}' = \mathbf{F}(x,\mathbf{y})$ with
+$\mathbf{y}=(y,y')^T$.
+
+\subsubsection*{Idea}
+The initial condition $y'(a) = s$ is unknown.  Treat it as a free
+parameter and define the residual
+\begin{equation}
+  E(s) = y(b;\,s) - \beta.
+  \label{eq:lec13:residual}
+\end{equation}
+Find $s^*$ such that $E(s^*)=0$ using a 1D root-finder (secant
+method or Newton–Raphson on $E$).
+
+\subsubsection*{Algorithm}
+\begin{enumerate}
+  \item Guess $s$.
+  \item Integrate the IVP from $a$ to $b$ using an ODE solver (e.g.\ RK4).
+  \item Compute $E(s) = y(b;s) - \beta$.
+  \item Update $s$ by Newton–Raphson: $s \leftarrow s - E(s)/E'(s)$.
+  \item Repeat until $|E| < \eps$.
+\end{enumerate}
+
+\nt{Multiple solutions may exist.  The initial guess for $s$ determines which solution is found.}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Shooting to a Fitting Point}\label{subsec:lec13:fitting}
+
+For \emph{general} $N$-equation BVPs with $n_1$ boundary conditions
+at $x=a$ and $n_2$ boundary conditions at $x=b$ (with $n_1+n_2=N$),
+integrate from \emph{both} ends to an interior matching point $x_m$:
+
+\begin{enumerate}
+  \item Integrate forward from $a$ to $x_m$ using the $n_1$ known BCs
+        and $n_2$ free parameters $\mathbf{s}$.
+  \item Integrate backward from $b$ to $x_m$ using the $n_2$ known BCs.
+  \item Require continuity: $\mathbf{y}_\text{fwd}(x_m) = \mathbf{y}_\text{bwd}(x_m)$.
+        This gives $N$ equations for $N$ unknowns in $\mathbf{s}$.
+  \item Solve with multidimensional Newton–Raphson.
+\end{enumerate}
+
+This avoids catastrophic growth of one-sided solutions
+(e.g.\ exponentially growing solutions in quantum mechanics).
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Eigenvalue and Free-Boundary Problems}\label{subsec:lec13:eigenvalue}
+
+\subsubsection*{Eigenvalue problems}
+The energy $E$ (or frequency $\omega^2$) appears as an unknown parameter.
+E.g.\ for the Schrödinger equation one requires both $y$ and $y'$ to
+be continuous at $x_m$ and $y\to 0$ at infinity.  The eigenvalue
+condition is that the matching-point residual vanishes.
+
+\subsubsection*{Free-boundary problems}
+The domain endpoint $b$ is unknown.  Add $b$ to the list of shooting
+parameters and require an additional matching condition at $x=b$
+(e.g.\ $p(R)=0$ for stellar radius $R$).
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Numerov Method}\label{subsec:lec13:numerov}
+
+\subsubsection*{Target equation}
+The Numerov method applies to ODEs of the form
+\begin{equation}
+  y'' = f(x)\,y + g(x),
+  \label{eq:lec13:numerov_ode}
+\end{equation}
+with \emph{no} first-derivative term.  The Schrödinger equation
+$-\hbar^2 y''/(2m) + V(x)y = Ey$ is of this form.
+
+\subsubsection*{Discretisation}
+Using Taylor series, eliminate $y^{(4)}$ between adjacent cells.
+The result is
+\begin{equation}
+  \boxed{
+  \left(1 - \tfrac{h^2}{12}f_{n+1}\right)y_{n+1}
+  = 2\left(1 + \tfrac{5h^2}{12}f_n\right)y_n
+  - \left(1 - \tfrac{h^2}{12}f_{n-1}\right)y_{n-1}
+  + \frac{h^2}{12}(g_{n+1}+10g_n+g_{n-1})}
+  \label{eq:lec13:numerov}
+\end{equation}
+where $f_n = f(x_n)$, $g_n = g(x_n)$.
+The local truncation error is $\bigO{h^6}$ — two orders better than
+RK4 with the same step size.
+
+\nt{The Numerov method is only valid when $y''$ depends linearly on $y$ (no $y'$ term, no $y^2$ term).  For nonlinear ODEs fall back to RK4 or Adams methods.}

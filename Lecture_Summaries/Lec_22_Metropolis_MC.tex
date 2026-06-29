@@ -1,0 +1,124 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 22 — Metropolis Monte Carlo
+%% 77315 — Computational Physics
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 22 — Metropolis Monte Carlo}\label{sec:lec22}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+The Metropolis algorithm generates a Markov chain whose
+\emph{stationary distribution} is an arbitrary target
+$w(\mathbf{x})$.  It avoids the need to normalise $w$ or to
+draw independent samples.  We prove the key property of
+\emph{detailed balance}, discuss convergence, and apply the
+method to particle transport simulation (mean free path,
+random direction sampling).
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Markov Chains and Detailed Balance}\label{subsec:lec22:db}
+
+A Markov chain is a sequence of states $\mathbf{x}_0,\mathbf{x}_1,\ldots$
+where each $\mathbf{x}_{k+1}$ depends only on $\mathbf{x}_k$
+(the Markov property).  The chain converges to stationary
+distribution $w$ if for all pairs of states $\mathbf{x},\mathbf{y}$:
+\begin{equation}
+  w(\mathbf{x})\,T(\mathbf{x}\to\mathbf{y})
+  = w(\mathbf{y})\,T(\mathbf{y}\to\mathbf{x}),
+  \label{eq:lec22:detailed_balance}
+\end{equation}
+where $T(\mathbf{x}\to\mathbf{y})$ is the transition probability.
+This \emph{detailed balance} (microscopic reversibility) implies
+$w$ is preserved by the chain.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Metropolis Algorithm}\label{subsec:lec22:metro}
+
+Choose a \emph{proposal distribution} $q(\mathbf{y}|\mathbf{x})$
+(e.g.\ uniform in a ball of radius $\delta$ around $\mathbf{x}$).
+
+\begin{enumerate}
+  \item Start at state $\mathbf{x}$.
+  \item Propose $\mathbf{y}$ from $q(\cdot|\mathbf{x})$.
+  \item Compute acceptance ratio:
+        \begin{equation}
+          r = \frac{w(\mathbf{y})\,q(\mathbf{x}|\mathbf{y})}
+                   {w(\mathbf{x})\,q(\mathbf{y}|\mathbf{x})}.
+          \label{eq:lec22:acceptance}
+        \end{equation}
+        For symmetric proposals $q(\mathbf{x}|\mathbf{y})=q(\mathbf{y}|\mathbf{x})$
+        (Metropolis–Hastings reduces to original Metropolis):
+        $r = w(\mathbf{y})/w(\mathbf{x})$.
+  \item Draw $u\sim\text{Uniform}(0,1)$.
+        Accept: $\mathbf{x}\leftarrow\mathbf{y}$ if $u < \min(1,r)$;
+        otherwise $\mathbf{x}\leftarrow\mathbf{x}$ (stay).
+  \item Discard a burn-in period (equilibration).
+  \item Use remaining $\mathbf{x}_k$ as samples from $w$.
+\end{enumerate}
+
+\subsubsection*{Proof of detailed balance}
+For a transition from $\mathbf{x}$ to $\mathbf{y}$ with $r<1$:
+$T(\mathbf{x}\to\mathbf{y}) = q(\mathbf{y}|\mathbf{x})\cdot r
+= q(\mathbf{y}|\mathbf{x})\,w(\mathbf{y})/w(\mathbf{x})$.
+Then $w(\mathbf{x})\,T(\mathbf{x}\to\mathbf{y})
+= q(\mathbf{y}|\mathbf{x})\,w(\mathbf{y})
+= w(\mathbf{y})\,T(\mathbf{y}\to\mathbf{x})$ (since $r^{-1}\ge 1$
+means the reverse transition is always accepted). $\square$
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Practical Considerations}\label{subsec:lec22:practice}
+
+\subsubsection*{Step size $\delta$}
+\begin{itemize}
+  \item Too large: almost all proposals rejected; chain explores slowly.
+  \item Too small: proposals always accepted but correlation length
+        is very long — also slow decorrelation.
+  \item Optimal acceptance rate $\approx 23$\%–$50$\% (dimension-dependent).
+\end{itemize}
+
+\subsubsection*{Autocorrelation time}
+Consecutive samples $\mathbf{x}_k$, $\mathbf{x}_{k+1}$ are
+correlated.  The \emph{autocorrelation time} $\tau$ measures the
+number of steps between effectively independent samples.
+The effective sample size is $N_{\rm eff} = N / (2\tau)$.
+
+\nt{$w(\mathbf{x})$ need not be normalised — only the ratio $r = w(\mathbf{y})/w(\mathbf{x})$ is needed.  This is the primary advantage over direct sampling methods.}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Particle Transport Monte Carlo}\label{subsec:lec22:transport}
+
+\subsubsection*{Mean free path}
+A particle moving through a medium of number density $n_0$
+with cross-section $\sigma$ has mean free path
+\begin{equation}
+  \bar\ell = \frac{1}{n_0\sigma}.
+  \label{eq:lec22:mfp}
+\end{equation}
+The path length to the next collision is exponentially distributed:
+\begin{equation}
+  P(\ell) = \frac{1}{\bar\ell}\,e^{-\ell/\bar\ell}.
+  \label{eq:lec22:path}
+\end{equation}
+Sample from \eqref{eq:lec22:path} using the inverse-CDF:
+$\ell = -\bar\ell\,\ln(1-u)$, $u\sim\text{Uniform}(0,1)$.
+
+\subsubsection*{Random direction}
+Sample an isotropic direction in 3D by drawing
+$\cos\theta \sim \text{Uniform}(-1,1)$ and
+$\phi \sim \text{Uniform}(0,2\pi)$:
+\begin{equation}
+  \hat{n} = (\sin\theta\cos\phi,\;\sin\theta\sin\phi,\;\cos\theta).
+  \label{eq:lec22:direction}
+\end{equation}
+
+\subsubsection*{Simulation loop}
+\begin{enumerate}
+  \item Initialise particle position and direction.
+  \item Sample path length $\ell$ from \eqref{eq:lec22:path}.
+  \item Advance particle; record tallies (energy deposition, flux).
+  \item Sample new direction from scattering kernel.
+  \item Repeat until the particle escapes or is absorbed.
+\end{enumerate}
+Repeat for $N$ particles; physical observables are ensemble averages
+with error $\sim N^{-1/2}$.

@@ -1,0 +1,139 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 17 — Diffusion and Advection as IVPs; Tridiagonal Solver
+%% 77315 — Computational Physics
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 17 — Diffusion \& Advection IVPs; Tridiagonal Systems}\label{sec:lec17}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+We derive stability conditions for the explicit FTCS scheme,
+introduce the unconditionally stable implicit BTCS scheme,
+and derive the second-order Crank–Nicholson method.
+The 2D extension uses Alternating-Direction Implicit (ADI).
+The time-dependent Schrödinger equation uses the norm-conserving
+Cayley form.  The advection equation uses the Lax and leapfrog
+schemes with the Courant–Friedrichs–Lewy (CFL) condition.
+All implicit schemes reduce to tridiagonal systems solved in $\bigO{N}$
+by the Thomas algorithm.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{FTCS: Explicit Diffusion}\label{subsec:lec17:ftcs}
+
+FTCS update for $u_t = D\,u_{xx}$:
+\begin{equation}
+  u_j^{n+1} = u_j^n + \lambda(u_{j+1}^n - 2u_j^n + u_{j-1}^n),
+  \quad \lambda = \frac{D\Delta t}{(\Delta x)^2}.
+  \label{eq:lec17:ftcs}
+\end{equation}
+
+\subsubsection*{Von Neumann stability}
+Insert a Fourier mode $u_j^n = \xi^n e^{ikj\Delta x}$.  The
+amplification factor is $\xi = 1 - 4\lambda\sin^2(k\Delta x/2)$.
+Stability requires $|\xi|\le 1$:
+\begin{equation}
+  \boxed{\lambda \le \tfrac{1}{2}}
+  \quad\Leftrightarrow\quad
+  \Delta t \le \frac{(\Delta x)^2}{2D}.
+  \label{eq:lec17:ftcs_stability}
+\end{equation}
+In $d$ dimensions the condition becomes $2dD\Delta t/(\Delta x)^2 \le 1$.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{BTCS: Fully Implicit}\label{subsec:lec17:btcs}
+
+Use the time derivative at the \emph{new} time level:
+\begin{equation}
+  -\lambda u_{j-1}^{n+1} + (1+2\lambda)u_j^{n+1}
+  - \lambda u_{j+1}^{n+1} = u_j^n.
+  \label{eq:lec17:btcs}
+\end{equation}
+This is \textbf{unconditionally stable} for all $\lambda>0$, but
+requires solving a tridiagonal system at each time step.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Crank--Nicholson}\label{subsec:lec17:cn}
+
+Average the spatial operator at times $n$ and $n+1$:
+\begin{equation}
+  -\tfrac{\lambda}{2}u_{j-1}^{n+1} + (1+\lambda)u_j^{n+1}
+  - \tfrac{\lambda}{2}u_{j+1}^{n+1}
+  = \tfrac{\lambda}{2}u_{j-1}^n + (1-\lambda)u_j^n
+    + \tfrac{\lambda}{2}u_{j+1}^n.
+  \label{eq:lec17:cn}
+\end{equation}
+Unconditionally stable and \textbf{second-order} in both space
+($\bigO{(\Delta x)^2}$) and time ($\bigO{(\Delta t)^2}$).
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{ADI for 2D Diffusion}\label{subsec:lec17:adi}
+
+Split each time step into two half-steps:
+implicit in $x$, explicit in $y$ for the first half;
+explicit in $x$, implicit in $y$ for the second half.
+Each half-step solves $N$ independent tridiagonal systems of size $N$,
+giving total cost $\bigO{N^2}$ per full time step.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Time-Dependent Schrödinger Equation (Cayley Form)}\label{subsec:lec17:tdse}
+
+The formal time-evolution operator $U = e^{-i\hat{H}\Delta t/\hbar}$
+must be unitary.  The Cayley (Crank–Nicholson in imaginary time)
+approximation:
+\begin{equation}
+  U \approx \frac{1 - \tfrac{i\Delta t}{2\hbar}\hat{H}}
+             {1 + \tfrac{i\Delta t}{2\hbar}\hat{H}}
+  \label{eq:lec17:cayley}
+\end{equation}
+is exactly unitary ($|U|=1$) and second-order.  Implemented as a
+solve plus a matrix–vector multiply — each step involves one tridiagonal
+system.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Advection Equation}\label{subsec:lec17:advection}
+
+$u_t + v\,u_x = 0$, $v>0$ constant.
+
+\subsubsection*{Lax method}
+\begin{equation}
+  u_j^{n+1} = \tfrac{1}{2}(u_{j+1}^n + u_{j-1}^n)
+             - \tfrac{v\Delta t}{2\Delta x}(u_{j+1}^n - u_{j-1}^n).
+  \label{eq:lec17:lax}
+\end{equation}
+Stable when the \textbf{CFL condition} holds:
+\begin{equation}
+  \boxed{C = \frac{|v|\Delta t}{\Delta x} \le 1.}
+  \label{eq:lec17:cfl}
+\end{equation}
+Lax is first-order in time; it adds numerical diffusion proportional
+to $(1-C^2)$.
+
+\subsubsection*{Leapfrog (staggered in time)}
+Second-order in space and time, but requires storing two time levels:
+\begin{equation}
+  u_j^{n+1} = u_j^{n-1}
+             - \frac{v\Delta t}{\Delta x}(u_{j+1}^n - u_{j-1}^n).
+  \label{eq:lec17:leapfrog}
+\end{equation}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Thomas Algorithm for Tridiagonal Systems}\label{subsec:lec17:thomas}
+
+A tridiagonal system $a_j u_{j-1} + b_j u_j + c_j u_{j+1} = d_j$
+is solved in $\bigO{N}$ operations by the Thomas algorithm (LU
+decomposition restricted to the tridiagonal structure):
+
+\begin{enumerate}
+  \item \textbf{Forward sweep} (eliminate sub-diagonal):
+        \begin{equation}
+          w_j = b_j - a_j\frac{c_{j-1}}{w_{j-1}}, \quad
+          g_j = d_j - a_j\frac{g_{j-1}}{w_{j-1}}.
+          \label{eq:lec17:thomas_fwd}
+        \end{equation}
+  \item \textbf{Back substitution}:
+        $u_N = g_N/w_N$,\quad
+        $u_j = (g_j - c_j u_{j+1})/w_j$.
+\end{enumerate}
+
+\nt{The Thomas algorithm costs only $\bigO{N}$ — a factor of $N^2$ cheaper than Gaussian elimination for a general $N\times N$ matrix.  All implicit PDE schemes presented above exploit this.}

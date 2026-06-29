@@ -1,0 +1,100 @@
+%%═══════════════════════════════════════════════════════════════════
+%% Lecture 11 — Function Minimization
+%% 77315 — Computational Physics
+%%═══════════════════════════════════════════════════════════════════
+
+\section{Lecture 11 — Function Minimization}\label{sec:lec11}
+\hrule\vspace{1.5em}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection*{Overview}
+Finding minima of scalar functions arises in energy minimisation,
+variational principles, and parameter fitting.  We study three
+complementary methods: (1)~\emph{bracketing} via the golden-section
+search (derivative-free, 1D); (2)~\emph{gradient descent}
+(multidimensional, first-order); (3)~\emph{Newton's method for
+minimization} (multidimensional, second-order).
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{1D Bracketing: Golden-Section Search}\label{subsec:lec11:golden}
+
+\subsubsection*{Setup}
+Given a unimodal function $f(x)$, find three points $a<b<c$ such that
+$f(b)<f(a)$ and $f(b)<f(c)$ (a bracket).  Repeatedly probe the
+\emph{larger} sub-interval to shrink the bracket.
+
+\subsubsection*{Golden-section ratio}
+The probe point $x$ is placed so that both sub-intervals have the same
+shrink ratio regardless of which branch is discarded.  This gives the
+golden-section ratio
+\begin{equation}
+  w = \frac{3-\sqrt{5}}{2} \approx 0.382.
+  \label{eq:lec11:golden}
+\end{equation}
+Each iteration reduces the bracket length by factor $1-w = 0.618$
+(the golden ratio $\phi$), requiring no function derivatives.
+
+\subsubsection*{Algorithm}
+\begin{enumerate}
+  \item Find a bracket $(a,b,c)$ with $f(b)<f(a),\,f(b)<f(c)$.
+  \item Identify the larger sub-interval (say $[b,c]$).
+  \item Place a probe at $x = b + w(c-b)$; evaluate $f(x)$.
+  \item If $f(x)<f(b)$: new bracket is $(b,x,c)$; else $(a,b,x)$.
+  \item Repeat until $c-a < \eps$.
+\end{enumerate}
+
+\nt{The method assumes a single-well (unimodal) shape.  For multimodal functions a global search (e.g.\ random sampling or simulated annealing) is needed to locate a good starting bracket.}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Gradient Descent}\label{subsec:lec11:gradient}
+
+For a differentiable function $f:\mathbb{R}^n\to\mathbb{R}$, the
+steepest-descent update is
+\begin{equation}
+  \mathbf{x}_{k+1} = \mathbf{x}_k - \alpha_k\,\nabla f(\mathbf{x}_k),
+  \label{eq:lec11:gd}
+\end{equation}
+where $\alpha_k > 0$ is a step length chosen by a line search along
+$-\nabla f$.
+
+\subsubsection*{Convergence}
+Near the minimum gradient descent converges \emph{linearly} with rate
+depending on the condition number $\kappa = \lambda_{\max}/\lambda_{\min}$
+of the Hessian.  For ill-conditioned problems conjugate-gradient or
+quasi-Newton methods are preferred.
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Newton's Method for Minimization}\label{subsec:lec11:newton}
+
+At a minimum, $\nabla f = \mathbf{0}$.  Apply Newton–Raphson to this
+system.  The Hessian $\Hess_{ij} = \partial^2 f/\partial x_i\partial x_j$
+plays the role of the Jacobian:
+\begin{equation}
+  \mathbf{x}_{k+1} = \mathbf{x}_k - \Hess^{-1}(\mathbf{x}_k)\,\nabla f(\mathbf{x}_k).
+  \label{eq:lec11:newton}
+\end{equation}
+Convergence is \emph{quadratic} near the minimum.
+
+\subsubsection*{Positive-definiteness check}
+Newton's method only gives a descent direction when $\Hess$ is
+positive definite (all eigenvalues $>0$).  A practical check uses
+Gaussian elimination: if a negative pivot is encountered, $\Hess$ is
+not positive definite and one must fall back to gradient descent for
+that step.
+
+\nt{Far from the minimum the Hessian may not be positive definite.  A common fix is to add a multiple of the identity, $\Hess \leftarrow \Hess + \mu I$, (Levenberg–Marquardt damping) to ensure positive definiteness.}
+
+%%──────────────────────────────────────────────────────────────────
+\subsection{Summary of Methods}\label{subsec:lec11:summary}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Method & Derivatives & Convergence & Cost/step \\
+\midrule
+Golden section  & none        & linear  & 1 eval \\
+Gradient descent & $\nabla f$ & linear  & 1 grad \\
+Newton           & $\Hess$    & quadratic & $n^2$ \\
+\bottomrule
+\end{tabular}
+\end{center}

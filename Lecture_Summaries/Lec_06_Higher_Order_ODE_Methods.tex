@@ -103,7 +103,7 @@ past values are essentially free.
 The exact integral form of the ODE is
 \begin{equation}
     y_{n+1}
-    = y_n+\int_{x_n}^{x_{n+1}} f(x,y(x))\,dx.
+    = y_n+\int_{x_n}^{x_{n+1}} f(x,y(x))\, dx.
     \label{eq:lec06:integral-form}
 \end{equation}
 The Adams-Bashforth idea is to approximate the integrand over
@@ -122,13 +122,13 @@ Use a linear extrapolation through $(x_{n-1},f_{n-1})$ and $(x_n,f_n)$:
 \end{equation}
 Substitute this into Eq.~\eqref{eq:lec06:integral-form}. The first term gives
 \begin{equation}
-    \int_{x_n}^{x_{n+1}} f_n\,dx=h f_n,
+    \int_{x_n}^{x_{n+1}} f_n\, dx=h f_n,
     \label{eq:lec06:ab2-integral-first}
 \end{equation}
 and the correction term gives
 \begin{equation}
     \int_{x_n}^{x_{n+1}}
-    \frac{x-x_n}{h}\left(f_n-f_{n-1}\right)\,dx
+    \frac{x-x_n}{h}\left(f_n-f_{n-1}\right)\, dx
     =\frac{h}{2}\left(f_n-f_{n-1}\right).
     \label{eq:lec06:ab2-integral-second}
 \end{equation}

@@ -16,14 +16,14 @@
 
 %%──────────────────────────────────────────────────────────────────
 \subsection{Numerical Integration (Quadrature)}
-Numerical integration calculates the area under a curve $\int_a^b f(x)\,dx$
+Numerical integration calculates the area under a curve $\int_a^b f(x)\, dx$
 by evaluating the function at specific discrete points.
 
 \begin{itemize}
     \item \textbf{Simpson's Rule}: Groups points in sets of three and fits a
     parabola through them. The area under this parabola gives:
     \begin{equation}
-    \int_{-h}^{h} f(x)\,dx = \frac{h}{3}\bigl[f(-h) + 4f(0) + f(h)\bigr]
+    \int_{-h}^{h} f(x)\, dx = \frac{h}{3}\bigl[f(-h) + 4f(0) + f(h)\bigr]
     \end{equation}
     It is remarkably accurate, possessing a global error of $\bigO{h^4}$.
 
