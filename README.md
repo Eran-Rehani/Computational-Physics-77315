@@ -72,3 +72,10 @@ jupyter notebook
 ```
 numpy  scipy  matplotlib  pandas  sympy  jupyter
 ```
+
+## Lecture summaries
+
+The LaTeX lecture summaries for this course have moved to
+[lecture-notes-huji/77315-computational-physics](https://github.com/Eran-Rehani/lecture-notes-huji/tree/main/77315-computational-physics),
+alongside the summaries for the other Year 3 courses. This repository keeps the
+assignment code.
