@@ -1837,8 +1837,8 @@ Simulation:
   --quick                 all three velocities at N=500
   --tol=X                 production run at RK4 position tolerance X kpc
   --tag=NAME              suffix for the output files of this run
-  --convergence           energy drift versus tolerance (Table 1)
-  --theta-table           tree error versus opening angle (Table 4)
+  --convergence           energy drift versus tolerance (Table 2)
+  --theta-table           tree error versus opening angle (Table 1)
 
 Rebuilding report products from saved runs, no dynamics repeated:
   --redraw                figures (a), (b), (c) from the saved V=80 state
