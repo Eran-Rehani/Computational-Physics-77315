@@ -215,7 +215,7 @@ When a particle leaves the box I drop it from the system, and its kinetic and po
 \begin{equation}
     E_{\mathrm{corrected}}(t) = E_{\mathrm{retained}}(t) + \sum_{k \in \mathrm{escapers}} E_{\mathrm{esc}, k}.
 \end{equation}
-I remove a particle as soon as it crosses the box boundary, even if it is still bound to the cluster. For $V=80\text{ km/s}$, 167 particles leave in 123 removal events. Of those, 21 have a total recorded energy at or below zero, $E_k+E_g\leq0$.
+I remove a particle as soon as it crosses the box boundary, even if it is still bound to the cluster. For $V=80\text{ km/s}$, 167 particles leave in 123 removal events. Of those events, 21 have a total recorded energy at or below zero, $E_k+E_g\leq0$. I record one total per event rather than one per particle, so 32 events that remove more than one particle carry a single combined value.
 
 \subsection{Density profile and King fit}
 
@@ -648,7 +648,7 @@ step size.
     \end{tabular}
 \end{table}
 
-\begin{figure}[p]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.82\textwidth]{figures/fig_a_eps01.pdf}
     \caption{Particle positions for $V=\SI{80}{km/s}$ using the assigned

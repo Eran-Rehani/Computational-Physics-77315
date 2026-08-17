@@ -1847,7 +1847,7 @@ Rebuilding report products from saved runs, no dynamics repeated:
   --tolerance-fig         the tolerance comparison figure
   --rerun-v80=X           repeat only V=80 at tolerance X
 
-The first four accept --tag=NAME to select a tagged set, e.g.
+The first three accept --tag=NAME to select a tagged set, e.g.
   python nbody_solver.py --refit --tag=eps01
 """
 
