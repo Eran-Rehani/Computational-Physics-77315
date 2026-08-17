@@ -1391,6 +1391,32 @@ def load_run_npz(V, tag=""):
                 esc_log=[tuple(row) for row in d["esc_log"]])
 
 
+def tex_sci(value, digits=2):
+    """Render a float as LaTeX scientific notation, e.g. $9.14\\times10^{-3}$.
+
+    Python's %e gives "9.14e-03", which reads as source code next to the
+    \\num{} and \\times10^{} forms the report uses in its prose.
+    """
+    if value == 0.0:
+        return "$0$"
+    exp = int(np.floor(np.log10(abs(value))))
+    mant = value / 10.0 ** exp
+    return f"${mant:.{digits}f}\\times10^{{{exp}}}$"
+
+
+def tex_sci_pm(value, err, digits=3):
+    """Render value and error on one shared power of ten.
+
+    (2.766 +- 0.110) x 10^5 keeps the two numbers directly comparable, which
+    separate exponents on each do not.
+    """
+    exp = int(np.floor(np.log10(abs(value))))
+    mant = value / 10.0 ** exp
+    merr = err / 10.0 ** exp
+    return (f"$({mant:.{digits}f} \\pm {merr:.{digits}f})"
+            f"\\times10^{{{exp}}}$")
+
+
 def write_king_table(results, path):
     """Write fitted King parameters as a booktabs table fragment."""
     with open(path, "w") as f:
@@ -1405,7 +1431,7 @@ def write_king_table(results, path):
             beta_text = (f"{p[3]:.3f} $\\pm$ {e[3]:.3f}"
                          if e[3] > 0 else f"{p[3]:.3f} (fixed)")
             f.write(f"{res['V']:.0f} & "
-                    f"{p[0]:.3e} $\\pm$ {e[0]:.2e} & "
+                    f"{tex_sci_pm(p[0], e[0])} & "
                     f"{p[1]:.3f} $\\pm$ {e[1]:.3f} & "
                     f"{alpha_text} & {beta_text} \\\\\n")
         f.write("\\bottomrule\n\\end{tabular}\n")
@@ -1639,7 +1665,7 @@ def convergence_study(tols=(133.2, 13.32, 1.332, 0.1332),
                     "$\\max\\abs{\\Delta E/E_0}$ \\\\\n\\midrule\n")
             for r in rows:
                 f.write(f"{r['tol']:.4g} & {r['steps']} & {r['reject']} & "
-                        f"{r['Nf']} & {r['max_abs_drift']:.2e} \\\\\n")
+                        f"{r['Nf']} & {tex_sci(r['max_abs_drift'])} \\\\\n")
             f.write("\\bottomrule\n\\end{tabular}\n")
     return rows
 
@@ -1673,7 +1699,7 @@ def theta_accuracy_table(thetas=(2.0, 1.5, 1.0, 0.8, 0.6, 0.4), N=3000,
             f.write("$\\theta$ (diagonal) & $\\theta$ (side) & "
                     "$L_2$ relative error in $\\mathbf{a}$ \\\\\n\\midrule\n")
             for th, th_std, l2 in rows:
-                f.write(f"{th:.1f} & {th_std:.3f} & {l2:.2e} \\\\\n")
+                f.write(f"{th:.1f} & {th_std:.3f} & {tex_sci(l2)} \\\\\n")
             f.write("\\bottomrule\n\\end{tabular}\n")
     return rows
 
